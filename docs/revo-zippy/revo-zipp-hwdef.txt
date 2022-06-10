@@ -1,0 +1,34 @@
+modify revo-mini/ hwdef.dat 
+
+#instead of flexiport for USART use flexiport for I2C2  ### done
+        revo-mini             revo-zippy
+PB10    USART3_TX             I2C2_SCL    
+PB11    USART3_RX             I2C2_SDA
+
+#Instead of PWM out channels 5 and 6 use these pins for usart ### done
+          revo-mini          revo-zippy
+PA0       TIM2_CH1           UART4_TX
+PA1       TIM2_CH2           UART4_RX
+
+change PWM out pins ### done
+revo-zippy remove PA1 TIM2_CH2 TIM2 PWM(5) GPIO(54)
+revo-zippy remove PA0 TIM2_CH1 TIM2 PWM(6) GPIO(55)
+
+change SERIAL_ORDER  ### done
+
+ revo-mini SERIAL_ORDER OTG1 USART1 EMPTY USART3
+ revo-zippy SERIAL_ORDER OTG1 USART1 EMPTY UART4
+ 
+change i2c order ### done
+
+          # only one I2C bus
+revo-mini I2C_ORDER I2C1
+ 
+           # two I2C bus: I2C1 internal, I2C2 external
+revo-zippy I2C_ORDER I2C1 I2C2
+
+allow for probing of external compasses ### done
+ 
+revo-zippy define HAL_PROBE_EXTERNAL_I2C_COMPASSES
+
+
