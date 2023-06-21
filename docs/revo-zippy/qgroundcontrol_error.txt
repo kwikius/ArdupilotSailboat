@@ -1,0 +1,1 @@
+Error on link ttyUSB0. Error connecting: Could not create port. Permission error while locking device

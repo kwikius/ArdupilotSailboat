@@ -1,0 +1,9 @@
+Interesting parameters
+
+SPEED_MAX
+GUID_OPTIONS  set bit 6 (64 in decimal) for s-curves for navigation
+
+WP_ACCEL may affect speed in turns
+WP_RADIUS  could try modifying
+
+change ARMING_RUDDER to 1 from 2 2 is arm or disarm 1 is arming only. Maybe that is the disarming issue!
