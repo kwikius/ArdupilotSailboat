@@ -91,12 +91,12 @@ namespace {
 
   template <> struct windVaneDirectionSetup<DirectionTypeAnalog>{
 
-    static constexpr int pin = pinAUX1;
-    static constexpr float min_V = 0.0f;
-    static constexpr float max_V = 5.0f;
+    static constexpr int pin = 2;
+    static constexpr float min_V = 0.001f;
+    static constexpr float max_V = 3.299f;
     static constexpr float ofs_deg = 0.0f;
-    static constexpr float lpFilt_Hz = 0.5f;
-    static constexpr float deadZone_deg = 5.0f;
+    static constexpr float lpFilt_Hz = 0.2f;
+    static constexpr float deadZone_deg = 3.0f;
 
     static void apply()
     {
@@ -113,7 +113,6 @@ namespace {
 // to be called only once on boot for initializing objects
 void setup()
 {
-
     vehicle.init();
     serial_manager.init();
     AP::compass().init();
@@ -123,9 +122,12 @@ void setup()
     AP::gps().init(serial_manager);
     hal.console->printf("ArduPilot Wind Vane library test\n");
 
-    windVaneDirectionSetup<directionType>();
+    windVaneDirectionSetup<directionType>::apply();
 
     windVane.init(serial_manager);
+
+
+
 
 }
 
@@ -185,8 +187,8 @@ void loop(void)
         timer = AP_HAL::millis();
         windVane.update();
 
-        hal.console->printf("apparent wind angle = %5.2f",
-         static_cast<double>(windVane.get_apparent_wind_direction_rad()));
+        hal.console->printf("apparent wind angle = %5.2f deg\n",
+         static_cast<double>(wrap_360(degrees(windVane.get_apparent_wind_direction_rad()))));
     }
     hal.scheduler->delay(1);
 }
