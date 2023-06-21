@@ -20,7 +20,7 @@
 void setup();    //declaration of the setup() function
 void loop();     //declaration of the loop() function
 
-const AP_HAL::HAL& hal = AP_HAL::get_HAL();    //create a reference to AP_HAL::HAL object to get access to hardware specific functions. For more info see <https://ardupilot.org/dev/docs/learning-ardupilot-the-example-sketches.html/>  
+const AP_HAL::HAL& hal = AP_HAL::get_HAL();    //create a reference to AP_HAL::HAL object to get access to hardware specific functions. For more info see <https://ardupilot.org/dev/docs/learning-ardupilot-the-example-sketches.html/>
 
 AP_HAL::AnalogSource* chan;    //delare a pointer to AnalogSource object. AnalogSource class can be found in : AP_HAL->AnalogIn.h
 
@@ -30,25 +30,32 @@ void setup(void) {
     chan = hal.analogin->channel(0);    //initialization of chan variable. AnalogIn class can be found in : AP_HAL->AnalogIn.h
 }
 
-static int8_t pin;    //8 bit integer to hold the pin number.Pin number range is [0,15]
+static int8_t pin = 2;    //8 bit integer to hold the pin number.Pin number range is [0,15]
+
 
 //the loop function runs over and over again forever
 void loop(void) {
-    //get the average voltage reading
-    float v  = chan->voltage_average();    //note:the voltage value is divided into 1024 segments    
-    //start a new line after going through the 16 pins
-    if (pin == 0) {
-        hal.console->printf("\n");
+
+    if (chan->set_pin(pin) == true){
+
+       hal.scheduler->delay(200);
+       //get the average voltage reading
+       float const v  = chan->voltage_latest();    //note:the voltage value is divided into 1024 segments
+       //print the voltage value(3 decimal places) alongside the pin number
+       hal.console->printf("[%u %.3f]\n",(unsigned)pin, (double)v);
+       //start a new line after going through the 16 pins
+    }else{
+       hal.console->printf("analog set pin %u failed\n",static_cast<unsigned int>(pin));
     }
-    //print the voltage value(3 decimal places) alongside the pin number 
-    hal.console->printf("[%u %.3f] ",
-              (unsigned)pin, (double)v);
-    //increment the pin number
-    pin = (pin+1) % 16;
+
+//    if (pin == 0) {
+//        hal.console->printf("\n");
+//    }
+//
+//    //increment the pin number
+//    pin = (pin+1) % 16;
     //set pin corresponding to the new pin value
-    IGNORE_RETURN(chan->set_pin(pin));
-    //give a delay of 100ms
-    hal.scheduler->delay(100);
+
 }
 
 AP_HAL_MAIN(); //HAL Macro that declares the main function. For more info see <https://ardupilot.org/dev/docs/learning-ardupilot-the-example-sketches.html/>
