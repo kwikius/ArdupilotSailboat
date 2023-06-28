@@ -1,0 +1,10 @@
+need  
+
+modes
+
+manual
+acro
+auto
+(rtl)   use 2 switches on jumper tx . one is rtl if other is set to any other mode than manual. use swc
+
+tack switch swd
