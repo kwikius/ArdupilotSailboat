@@ -160,16 +160,12 @@ void Sailboat::init()
 void Sailboat::init_rc_in()
 {
     // get auxiliary throttle value
-    RC_Channel *rc_ptr = rc().find_channel_for_option(RC_Channel::AUX_FUNC::MAINSAIL);
-    if (rc_ptr != nullptr) {
-        // use aux as sail input if defined
-        channel_mainsail = rc_ptr;
-        channel_mainsail->set_angle(100);
-        channel_mainsail->set_default_dead_zone(30);
-    } else {
-        // use throttle channel
+    channel_mainsail = rc().find_channel_for_option(RC_Channel::AUX_FUNC::MAINSAIL);
+    if (channel_mainsail == nullptr) {
         channel_mainsail = rover.channel_throttle;
     }
+    channel_mainsail->set_default_dead_zone(30);
+    channel_mainsail->set_range(100);
 }
 
 // decode pilot mainsail input and return in steer_out and throttle_out arguments
