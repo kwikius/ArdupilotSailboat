@@ -7,7 +7,9 @@ flexiPort (4 way JST-SH ) --> I2C ( magnetometer)
 mainPort (4 way JST-SH)  --> Telemetry usart
 
 PWMOUT ch1    --> Rudder servo
-PWMOUT ch3    --> ESC
+PWMOUT ch2    --> power in
+PWMOUT ch3    --> ESC/ mainsail
+PWMOUT ch4    --> Analog wind direction sensor
 
 PWMOut 5,6    --> GPS USART   (Pin6 yellow TXO from FC, pin5 white RXI to FC)
 
