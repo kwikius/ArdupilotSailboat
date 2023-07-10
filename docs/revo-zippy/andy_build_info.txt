@@ -1,0 +1,76 @@
+export PATH=/usr/lib/ccache:$PATH
+export PATH=$PATH:/home/andy/cpp/projects/ardupilot/Tools/autotest
+export PATH=$PATH:/home/andy/andy_bin/gcc-arm-none-eabi-10.3-2021.10-x86_64-linux/gcc-arm-none-eabi-10.3-2021.10/bin
+
+export PATH=/usr/lib/ccache:$PATH:/home/andy/cpp/projects/ardupilot/Tools/autotest:/home/andy/andy_bin/gcc-arm-none-eabi-10.3-2021.10-x86_64-linux/gcc-arm-none-eabi-10.3-2021.10/bin
+
+export PATH=$PATH:/home/andy/andy_bin/gcc-arm-none-eabi-9-2020-q2-update/bin
+
+NOTE: In Unbuntu 20  To build with waf explicitly use python3  eg.
+python3 ./waf configure --board revo-mini-i2c
+
+otherwise you get errors about "you need to install empy with 'python -m pip install empy'", except this doesnt work 
+since python doesnt have a empy module but python3 does appear to have... or something!
+
+./waf builds something which is not directly loadable by dfu. There are some parameters stored somewhere so thes may be corrupted when new firmware is installed. Alos there is a bootloader so the executable start is ot in usual place.
+
+To get a bootloader installed, just find a revo-mini_bl.bin , install that first using dfu, then waf can load the executable it creates
+
+// to build N.B not tested with this version
+python3  ./waf configure --board revo-mini
+python3  ./waf rover
+
+python3  ./waf configure --board revo-zippy
+python3  ./waf rover
+
+python3 ./waf configure --board revo-sailboat1
+python3  ./waf rover
+
+// examples
+python3 ./waf list | grep 'examples'
+
+For many examples with revo-zippy, you need to power the board from an external source as the peripherals will only be powered if the power comes from an external source on the board, rather than usb.
+
+Custom examples. You can set parameters to specific values in examples. There is an example in the AP_Airspeed/examples/Airspeed/Airspeed.cpp
+
+python3 ./waf build --target examples/INS_generic
+python3 ./waf build --target examples/GPS_AUTO_test
+python3 ./waf build --target examples/WindvaneExample1 --upload
+
+Only use dfu_util with the xxx_bl.bin versions. Let waf upload the others with --upload
+
+copter ---------
+
+arm-none-eabi-objcopy -I ihex arducopter_with_bl.hex -O binary arducopter_with_bl.bin
+
+dfu-util -a 0 --dfuse-address 0x08000000 -D arducopter_with_bl.bin
+
+30/01/22 17:58:42  OpenPilot Revolution tested with https://firmware.ardupilot.org/Copter/stable-3.6.1/revo-mini/
+Tested without any peripherals connected
+Worked ok with apm planner 2
+
+rover --------------------
+
+arm-none-eabi-objcopy -I ihex ardurover_with_bl.hex -O binary ardurover_with_bl.bin
+
+arm-none-eabi-objcopy -I ihex revo-mini_bl.hex -O binary revo-mini_bl.bin
+
+dfu-util -a 0 --dfuse-address 0x08000000 -D ardurover_with_bl.bin
+
+30/01/22 18:55:19  OpenPilot Revolution https://firmware.ardupilot.org/Rover/stable-4.1.3/revo-mini/
+ tested without any peripherals
+Worked OK with APM plannner in pitch roll yaw
+calibration of compass meant that heading was corrected, as initially very wrong, going in wrong direction.
+
+use python3 ./waf clean to clean
+use python3 ./waf distclean to switch to a new board type
+
+python3  ./waf configure --board revo-sailboat1
+
+python3 ./waf build --target examples/AnalogIn
+
+
+
+
+
+
