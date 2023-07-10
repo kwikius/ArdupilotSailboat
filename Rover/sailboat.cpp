@@ -227,27 +227,31 @@ void Sailboat::get_throttle_and_mainsail_out(float desired_speed, float &throttl
     const float wind_dir_apparent_abs = fabsf(wind_dir_apparent);
     const float wind_dir_apparent_sign = is_negative(wind_dir_apparent) ? -1.0f : 1.0f;
 
-    //
+
     // mainsail control
-    //
 
-    // main sails cannot be used to reverse
-    if (!is_positive(desired_speed)) {
+     // n.b with mainsail set in range 0 to 100
+     // get user mainsail percentage angle of attack
+     // max throttle gives smallest angle of attack and min throttle gives largest.
+     // this gives a feel in same sense as main sheet
+     float const user_mainsail_pc = 1.f - constrain_float(channel_mainsail->get_control_in(),0,100)/100;
+     // if mainsail angle is negligible just sheet right out
+     if ( user_mainsail_pc < 0.1f){
         mainsail_out = 100.0f;
-    } else {
-        // Sails are sheeted the same on each side use abs wind direction
-
-        // set the main sail to the ideal angle to the wind
-        float mainsail_angle = wind_dir_apparent_abs - sail_angle_ideal;
-
+     }else{
+        // set sail required angle of attack according to user mainsail input
+        float const sail_angle_req = sail_angle_ideal * user_mainsail_pc;
+        // set the main sail to the required angle to the wind
         // make sure between allowable range
-        mainsail_angle = constrain_float(mainsail_angle,sail_angle_min, sail_angle_max);
+        // Sails are sheeted the same on each side, so use abs wind direction
+        float const mainsail_angle = constrain_float(wind_dir_apparent_abs - sail_angle_req,sail_angle_min, sail_angle_max);
 
         // linear interpolate mainsail value (0 to 100) from wind angle mainsail_angle
-        float mainsail_base = linear_interpolate(0.0f, 100.0f, mainsail_angle,sail_angle_min,sail_angle_max);
+        float const mainsail_base = linear_interpolate(0.0f, 100.0f, mainsail_angle,sail_angle_min,sail_angle_max);
 
         mainsail_out = constrain_float((mainsail_base + pid_offset), 0.0f ,100.0f);
-    }
+     }
+
 
     //
     // wingsail control
