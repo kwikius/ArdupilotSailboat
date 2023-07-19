@@ -12,7 +12,7 @@ python3 ./waf configure --board revo-mini-i2c
 otherwise you get errors about "you need to install empy with 'python -m pip install empy'", except this doesnt work 
 since python doesnt have a empy module but python3 does appear to have... or something!
 
-./waf builds something which is not directly loadable by dfu. There are some parameters stored somewhere so thes may be corrupted when new firmware is installed. Alos there is a bootloader so the executable start is ot in usual place.
+./waf builds something which is not directly loadable by dfu. There are some parameters stored somewhere so these may be corrupted when new firmware is installed. Also there is a bootloader so the executable start location is not in the usual place.
 
 To get a bootloader installed, just find a revo-mini_bl.bin , install that first using dfu, then waf can load the executable it creates
 
