@@ -441,19 +441,25 @@ void Mode::navigate_to_waypoint()
     // do not do simple avoidance because this is already handled in the position controller
     calc_throttle(g2.wp_nav.get_speed(), false);
 
-    float desired_heading_cd = g2.wp_nav.oa_wp_bearing_cd();
+    const float desired_heading_cd = g2.wp_nav.oa_wp_bearing_cd();
+    // TODO also optionally allow downwind tacking
+    // change indirect route to indirect_upwind_route
+    // rename to If g2.sailboat.use_indirect_upwind_route(..)
     if (g2.sailboat.use_indirect_route(desired_heading_cd)) {
         // sailboats use heading controller when tacking upwind
-        desired_heading_cd = g2.sailboat.calc_heading(desired_heading_cd);
+        const float desired_heading_indirect_cd = g2.sailboat.calc_heading(desired_heading_cd);
         // use pivot turn rate for tacks
         const float turn_rate = g2.sailboat.tacking() ? g2.wp_nav.get_pivot_rate() : 0.0f;
-        calc_steering_to_heading(desired_heading_cd, turn_rate);
+
+        calc_steering_to_heading(desired_heading_indirect_cd, turn_rate);
+
     } else {
         // retrieve turn rate from waypoint controller
         float desired_turn_rate_rads = g2.wp_nav.get_turn_rate_rads();
 
         // if simple avoidance is active at very low speed do not attempt to turn
-        if (g2.avoid.limits_active() && (fabsf(attitude_control.get_desired_speed()) <= attitude_control.get_stop_speed())) {
+        if (g2.avoid.limits_active() && (fabsf(attitude_control.get_desired_speed())
+           <= attitude_control.get_stop_speed())) {
             desired_turn_rate_rads = 0.0f;
         }
 

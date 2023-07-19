@@ -219,8 +219,11 @@ void Sailboat::get_throttle_and_mainsail_out(float desired_speed, float &throttl
         return;
     }
 
-    // use PID controller to sheet out, this number is expected approximately in the 0 to 100 range (with default PIDs)
-    const float pid_offset = rover.g2.attitude_control.get_sail_out_from_heel(radians(sail_heel_angle_max), rover.G_Dt) * 100.0f;
+    // use PID controller to sheet out. This number is expected approximately
+    // in the 0 to 100 range (with default PIDs)
+    const float pid_offset =
+       rover.g2.attitude_control.get_sail_out_from_heel(
+       radians(sail_heel_angle_max), rover.G_Dt) * 100.0f;
 
     // get apparent wind, + is wind over starboard side, - is wind over port side
     const float wind_dir_apparent = degrees(rover.g2.windvane.get_apparent_wind_direction_rad());
@@ -235,7 +238,7 @@ void Sailboat::get_throttle_and_mainsail_out(float desired_speed, float &throttl
      // max throttle gives smallest angle of attack and min throttle gives largest.
      // this gives a feel in same sense as main sheet
      float const user_mainsail_pc = 1.f - constrain_float(channel_mainsail->get_control_in(),0,100)/100;
-     // if mainsail angle is negligible just sheet right out
+     // if mainsail angle is negligible ( less than 10 %) just sheet right out
      if ( user_mainsail_pc < 0.1f){
         mainsail_out = 100.0f;
      }else{
@@ -400,7 +403,8 @@ bool Sailboat::use_indirect_route(float desired_heading_cd) const
 
     // check if desired heading is in the no go zone, if it is we can't go direct
     // pad no go zone, this allows use of heading controller rather than L1 when close to the wind
-    return fabsf(wrap_PI(rover.g2.windvane.get_true_wind_direction_rad() - desired_heading_rad)) <= radians(sail_no_go + SAILBOAT_NOGO_PAD);
+    return fabsf(wrap_PI(rover.g2.windvane.get_true_wind_direction_rad() - desired_heading_rad))
+          <= radians(sail_no_go + SAILBOAT_NOGO_PAD);
 }
 
 // if we can't sail on the desired heading then we should pick the best heading that we can sail on
