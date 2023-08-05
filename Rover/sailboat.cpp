@@ -117,6 +117,12 @@ Sailboat::Sailboat()
 // true if sailboat navigation (aka tacking) is enabled
 bool Sailboat::tack_enabled() const
 {
+    return sail_enabled() &&
+    (motor_state != UseMotor::USE_MOTOR_ALWAYS) &&
+    (motor_assist_low_wind() == false)
+    ;
+
+/*
     // tacking disabled if not a sailboat
     if (!sail_enabled()) {
         return false;
@@ -131,27 +137,27 @@ bool Sailboat::tack_enabled() const
     if (motor_assist_low_wind()) {
         return false;
     }
-
+*/
     // otherwise tacking is enabled
-    return true;
+    //return true;
 }
 
 void Sailboat::init()
 {
     // sailboat defaults
     if (sail_enabled()) {
-        rover.g2.crash_angle.set_default(0);
-
+       // disable crash check, presumably messes if boat is heeled
+       rover.g2.crash_angle.set_default(0);
         // sailboats without motors may travel faster than WP_SPEED so allow waypoint navigation to
         // speedup to catch the vehicle instead of asking the vehicle to slow down
-        rover.g2.wp_nav.enable_overspeed(motor_state != UseMotor::USE_MOTOR_ALWAYS);
-    }
+       rover.g2.wp_nav.enable_overspeed(motor_state != UseMotor::USE_MOTOR_ALWAYS);
 
-    if (tack_enabled()) {
-        rover.g2.loit_type.set_default(1);
+       if (tack_enabled()) {
+           rover.g2.loit_type.set_default(1);
+       }
     }
-
     // initialise motor state to USE_MOTOR_ASSIST
+    // 2nd arg false means don't report failure
     // this will silently fail if there is no motor attached
     set_motor_state(UseMotor::USE_MOTOR_ASSIST, false);
 }
@@ -165,11 +171,14 @@ void Sailboat::init_rc_in()
         channel_mainsail = rover.channel_throttle;
     }
     channel_mainsail->set_default_dead_zone(30);
+    //
     channel_mainsail->set_range(100);
 }
 
+// called in manual mode
 // decode pilot mainsail input and return in steer_out and throttle_out arguments
 // mainsail_out is in the range 0 to 100, defaults to 100 (fully relaxed) if no input configured
+// change to get_pilot_desiredSailAngle
 void Sailboat::get_pilot_desired_mainsail(float &mainsail_out, float &wingsail_out, float &mast_rotation_out)
 {
     // no RC input means mainsail is moved to trim
@@ -186,6 +195,7 @@ void Sailboat::get_pilot_desired_mainsail(float &mainsail_out, float &wingsail_o
 
 // calculate throttle and mainsail angle required to attain desired speed (in m/s)
 // returns true if successful, false if sailboats not enabled
+// called in auto, acro, guidd, loite
 void Sailboat::get_throttle_and_mainsail_out(float desired_speed, float &throttle_out, float &mainsail_out, float &wingsail_out, float &mast_rotation_out)
 {
     if (!sail_enabled()) {
@@ -229,7 +239,6 @@ void Sailboat::get_throttle_and_mainsail_out(float desired_speed, float &throttl
     const float wind_dir_apparent = degrees(rover.g2.windvane.get_apparent_wind_direction_rad());
     const float wind_dir_apparent_abs = fabsf(wind_dir_apparent);
     const float wind_dir_apparent_sign = is_negative(wind_dir_apparent) ? -1.0f : 1.0f;
-
 
     // mainsail control
 
