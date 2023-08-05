@@ -47,7 +47,7 @@
 #define AR_ATTCONTROL_HEEL_SAIL_D       0.0f
 #define AR_ATTCONTROL_HEEL_SAIL_IMAX    1.0f
 #define AR_ATTCONTROL_HEEL_SAIL_FILT    10.0f
-#define AR_ATTCONTROL_DT                0.02f
+//#define AR_ATTCONTROL_DT                0.02f
 
 // throttle/speed control maximum acceleration/deceleration (in m/s) (_ACCEL_MAX parameter default)
 #define AR_ATTCONTROL_THR_ACCEL_MAX     1.00f
@@ -427,7 +427,13 @@ const AP_Param::GroupInfo AR_AttitudeControl::var_info[] = {
 
     // @Param: _SAIL_SMAX
     // @DisplayName: Sail heel slew rate limit
-    // @Description: Sets an upper limit on the slew rate produced by the combined P and D gains. If the amplitude of the control action produced by the rate feedback exceeds this value, then the D+P gain is reduced to respect the limit. This limits the amplitude of high frequency oscillations caused by an excessive gain. The limit should be set to no more than 25% of the actuators maximum slew rate to allow for load effects. Note: The gain will not be reduced to less than 10% of the nominal value. A value of zero will disable this feature.
+    // @Description: Sets an upper limit on the slew rate produced by the combined P and D gains.
+    // If the amplitude of the control action produced by the rate feedback exceeds this value,
+    // then the D+P gain is reduced to respect the limit.
+    // This limits the amplitude of high frequency oscillations caused by an excessive gain.
+    // The limit should be set to no more than 25% of the actuators maximum slew rate to allow for load effects.
+    // Note: The gain will not be reduced to less than 10% of the nominal value.
+    // A value of zero will disable this feature.
     // @Range: 0 200
     // @Increment: 0.5
     // @User: Advanced

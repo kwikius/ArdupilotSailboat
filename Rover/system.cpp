@@ -136,7 +136,9 @@ void Rover::init_ardupilot()
     rc().convert_options(RC_Channel::AUX_FUNC::SAVE_TRIM, RC_Channel::AUX_FUNC::TRIM_TO_CURRENT_SERVO_RC);
     rc().init();
 
-    rover.g2.sailboat.init();
+    if(rover.g2.sailboat.sail_enabled()){
+       rover.g2.sailboat.init();
+    }
 
     // boat should loiter after completing a mission to avoid drifting off
     if (is_boat()) {

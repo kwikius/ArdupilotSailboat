@@ -94,12 +94,14 @@ private:
     bool motor_assist_low_wind() const;
 
     // parameters
-    AP_Int8 enable;
-    AP_Float sail_angle_min;
+    AP_Int8 enable;  // true to enable sailboat functionality
+    AP_Float sail_angle_min;  // the sail angle when fully sheeted in
     AP_Float sail_angle_max;
     AP_Float sail_angle_ideal;
     AP_Float sail_heel_angle_max;
+    // The positive heading angle which is too close to the wind
     AP_Float sail_no_go;
+    //
     AP_Float sail_windspeed_min;
     AP_Float xtrack_max;
     AP_Float loit_radius;

@@ -1,0 +1,40 @@
+
+Ardupilot Rover Sailboat functionality
+
+an object of Sailboat class is declared in the ParametersG2 object
+access using
+
+   rover.g2.sailboat.f(...)
+
+check if in sailboat mode via
+
+   rover.g2.sailboat.sail_enabled()
+   
+   In sailboat 
+   
+   
+   
+In Sailboat::init() , shouldnt everything be dependent on sailboat.sail_enable();
+  
+  The sailboat.tack_enabled checks for sail_enabled()
+  
+  if sailboat.enabled() == false
+  The sailboat.motor assist() will warn "Sailboat: failed to enable motor"
+  and any of various conditions in sailboat.motor_assist() are true
+  
+  Similarly couldnt the Rover::init_ardupilot only call sailboat.init() if sailboat.sail_enable() == true
+  
+  To modify sail heel pids
+  
+  ATC_SAIL_P,1.00000000   // proportional error :  range 0:2
+  ATC_SAIL_I,0.10000000   // integral error     : range 0:2
+  ATC_SAIL_D,0.00000000   // differential error : range 0:0.1
+  
+ATC_SAIL_FF,0.00000000    // feed forward
+ATC_SAIL_FLTD,0.00000000  // differential filter
+ATC_SAIL_FLTE,10.00000000  // proportional filter
+ATC_SAIL_FLTT,0.00000000   //
+ATC_SAIL_IMAX,1.00000000   // integral term max limit
+ATC_SAIL_SMAX,0.00000000   // slew rate limit
+
+
