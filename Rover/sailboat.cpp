@@ -105,10 +105,6 @@ const AP_Param::GroupInfo Sailboat::var_info[] = {
     AP_GROUPEND
 };
 
-
-/*
-  constructor
- */
 Sailboat::Sailboat()
 {
     AP_Param::setup_object_defaults(this, var_info);
@@ -121,29 +117,43 @@ bool Sailboat::tack_enabled() const
     (motor_state != UseMotor::USE_MOTOR_ALWAYS) &&
     (motor_assist_low_wind() == false)
     ;
+}
 
-/*
-    // tacking disabled if not a sailboat
-    if (!sail_enabled()) {
-        return false;
-    }
+namespace {
+   Vector2f sail_pts[3] = {{0,0},{100,90},{101,90}};
+   constexpr unsigned int sail_pts_len = sizeof(sail_pts) / sizeof(sail_pts[0]);
+   unsigned int sail_num_points = 2U;
 
-    // tacking disabled if motor is always on
-    if (motor_state == UseMotor::USE_MOTOR_ALWAYS) {
-        return false;
-    }
+}
+// update the mainsail interpolation curve
+void Sailboat::init_mainsail_out_interpolation_curve()
+{
+    // by default there are only 2 points
+    sail_pts[0] = { 0.f,static_cast<float>(sail_angle_min)};
+    sail_pts[1] = { 100.f,static_cast<float>(sail_angle_max)};
+    sail_num_points = 2U;
 
-    // disable tacking if motor is available and wind is below cutoff
-    if (motor_assist_low_wind()) {
-        return false;
+    auto const midpt_channel = SRV_Channels::get_channel_for(SRV_Channel::k_sail_mid_pts1);
+    if (midpt_channel != nullptr ){
+         // move last point on
+         sail_pts[2] = sail_pts[1];
+         // place the mid point
+         sail_pts[1] = {
+             static_cast<float>(midpt_channel->get_output_min()),
+             static_cast<float>(midpt_channel->get_output_max())
+         };
+         sail_num_points = 3U;
+         // test the resulting array and back out the middle point if invalid
+         if ( !is_valid_linear_interpolate_points_array(sail_pts,sail_num_points)){
+            sail_pts[1] = sail_pts[2];
+            sail_num_points = 2U;
+         }
     }
-*/
-    // otherwise tacking is enabled
-    //return true;
 }
 
 void Sailboat::init()
 {
+
     // sailboat defaults
     if (sail_enabled()) {
        // disable crash check, presumably messes if boat is heeled
@@ -156,6 +166,7 @@ void Sailboat::init()
            rover.g2.loit_type.set_default(1);
        }
     }
+
     // initialise motor state to USE_MOTOR_ASSIST
     // 2nd arg false means don't report failure
     // this will silently fail if there is no motor attached
@@ -192,6 +203,7 @@ void Sailboat::get_pilot_desired_mainsail(float &mainsail_out, float &wingsail_o
     wingsail_out = constrain_float(channel_mainsail->get_control_in(), -100.0f, 100.0f);
     mast_rotation_out = constrain_float(channel_mainsail->get_control_in(), -100.0f, 100.0f);
 }
+
 
 // calculate throttle and mainsail angle required to attain desired speed (in m/s)
 // returns true if successful, false if sailboats not enabled
@@ -258,8 +270,8 @@ void Sailboat::get_throttle_and_mainsail_out(float desired_speed, float &throttl
         // Sails are sheeted the same on each side, so use abs wind direction
         float const mainsail_angle = constrain_float(wind_dir_apparent_abs - sail_angle_req,sail_angle_min, sail_angle_max);
 
-        // linear interpolate mainsail value (0 to 100) from wind angle mainsail_angle
-        float const mainsail_base = linear_interpolate(0.0f, 100.0f, mainsail_angle,sail_angle_min,sail_angle_max);
+        init_mainsail_out_interpolation_curve();
+        float const mainsail_base = linear_interpolate(mainsail_angle,sail_pts,sail_num_points);
 
         mainsail_out = constrain_float((mainsail_base + pid_offset), 0.0f ,100.0f);
      }

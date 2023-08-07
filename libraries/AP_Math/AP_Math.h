@@ -46,7 +46,7 @@ template <typename Arithmetic1, typename Arithmetic2>
 typename std::enable_if<std::is_floating_point<typename std::common_type<Arithmetic1, Arithmetic2>::type>::value, bool>::type
 is_equal(const Arithmetic1 v_1, const Arithmetic2 v_2);
 
-/* 
+/*
  * @brief: Check whether a float is zero
  */
 template <typename T>
@@ -56,7 +56,7 @@ inline bool is_zero(const T fVal1) {
     return is_zero(static_cast<float>(fVal1));
 }
 
-/* 
+/*
  * @brief: Check whether a float is greater than zero
  */
 template <typename T>
@@ -67,7 +67,7 @@ inline bool is_positive(const T fVal1) {
 }
 
 
-/* 
+/*
  * @brief: Check whether a float is less than zero
  */
 template <typename T>
@@ -306,7 +306,16 @@ float linear_interpolate(float low_output, float high_output,
                          float var_value,
                          float var_low, float var_high);
 
-/* cubic "expo" curve generator 
+/*
+ * linear interpolation based on set of 2d points
+   The x values of pts must increase as index increases
+   Length of the pts array must be greater than 1
+   validate pts array before use using is_valid_linear_interpolate_points_array
+ */
+float linear_interpolate(float var_value,Vector2F const * pts, unsigned int len);
+bool is_valid_linear_interpolate_points_array(Vector2F const * pts, unsigned int len);
+
+/* cubic "expo" curve generator
  * alpha range: [0,1] min to max expo
  * input range: [-1,1]
  */
