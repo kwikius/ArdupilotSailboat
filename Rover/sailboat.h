@@ -35,6 +35,8 @@ public:
     // initialise rc input (channel_mainsail)
     void init_rc_in();
 
+    void init_mainsail_out_interpolation_curve();
+
     // decode pilot mainsail input and return in steer_out and throttle_out arguments
     // mainsail_out is in the range 0 to 100, defaults to 100 (fully relaxed) if no input configured
     // wingsail_out is in the range -100 to 100, defaults to 0

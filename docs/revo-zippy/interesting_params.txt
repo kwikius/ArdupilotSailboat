@@ -3,6 +3,8 @@ Interesting parameters
 SPEED_MAX
 GUID_OPTIONS  set bit 6 (64 in decimal) for s-curves for navigation
 
+LOIT_TYPE  If you don't have a reversing ESC set to 1 which means always face bow towards target in loiter
+
 WP_ACCEL may affect speed in turns
 WP_RADIUS  could try modifying
 

@@ -114,6 +114,44 @@ float linear_interpolate(float low_output, float high_output,
     return low_output + p * (high_output - low_output);
 }
 
+bool is_valid_linear_interpolate_points_array(Vector2f const * pts, unsigned int len)
+{
+  if( len < 2){
+    return false;
+  }
+  for ( unsigned i =0; i < (len-1);++i){
+     if ( pts[i+1].x <= pts[i].x){
+        return false;
+     }
+  }
+  return true;
+}
+
+float linear_interpolate(float var_value,Vector2f const * pts, unsigned int len)
+{
+    // at or below xmin
+    if ( var_value <= pts[0].x){
+       return pts[0].y;
+    }
+    // at or above x max
+    if ( var_value >= pts[len-1U].x){
+       return pts[len-1U].y;
+    }
+
+    for ( auto i = 0U; i < (len-1U); ++i){
+       float const var_high = pts[i+1].x;
+       if ( var_value < var_high){
+          float const var_low = pts[i].x;
+          float const low_output = pts[i].y;
+          float const high_output = pts[i+1].y;
+          float const p = (var_value - var_low) / (var_high - var_low);
+          return low_output + p * (high_output - low_output);
+       }
+     }
+     // never get here
+     return 0.f;
+}
+
 /* cubic "expo" curve generator
  * alpha range: [0,1] min to max expo
  * input range: [-1,1]
