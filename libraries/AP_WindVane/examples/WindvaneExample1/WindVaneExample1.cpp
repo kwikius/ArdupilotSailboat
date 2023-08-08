@@ -80,8 +80,7 @@ namespace {
        }
    }
 
-  static constexpr int pinAUX1 = 50;
-
+   // WNDVN_TYPE
   static constexpr int DirectionTypeAnalog = 3;
 
   static constexpr int directionType = DirectionTypeAnalog;
@@ -91,7 +90,24 @@ namespace {
 
   template <> struct windVaneDirectionSetup<DirectionTypeAnalog>{
 
-    static constexpr int pin = 2;
+  /*
+     set WNDVN_DIR_PIN according to your hardware
+     See https://ardupilot.org/rover/docs/parameters.html#wndvn-dir-pin-wind-vane-analog-voltage-pin-for-direction
+      2 OpenPilot Revolution custom hwdef
+      11 Pixracer
+      13 Pixhawk ADC4
+      14 Pixhawk ADC3
+      15 Pixhawk ADC6/Pixhawk2 ADC
+      50 AUX1
+      51 AUX2
+      52 AUX3
+      53 AUX4
+      54 AUX5
+      55 AUX6
+      103  Pixhawk SBUS
+  */
+    static constexpr int pin = 2;  // on OpenPilot Revolution custom hwdef
+
     static constexpr float min_V = 0.001f;
     static constexpr float max_V = 3.299f;
     static constexpr float ofs_deg = 0.0f;
