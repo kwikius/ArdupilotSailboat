@@ -120,7 +120,7 @@ bool Sailboat::tack_enabled() const
 }
 
 namespace {
-   Vector2f sail_pts[3] = {{0,0},{100,90},{101,90}};
+   Vector2F sail_pts[3] = {{0,0},{100,90},{101,90}};
    constexpr unsigned int sail_pts_len = sizeof(sail_pts) / sizeof(sail_pts[0]);
    unsigned int sail_num_points = 2U;
 
