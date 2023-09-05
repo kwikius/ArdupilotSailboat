@@ -114,7 +114,9 @@ float linear_interpolate(float low_output, float high_output,
     return low_output + p * (high_output - low_output);
 }
 
-bool is_valid_linear_interpolate_points_array(Vector2f const * pts, unsigned int len)
+//bool is_valid_linear_interpolate_points_array(Vector2f const * pts, unsigned int len);
+
+bool is_valid_linear_interpolate_points_array(Vector2F const * pts, unsigned int len)
 {
   if( len < 2){
     return false;
@@ -126,8 +128,7 @@ bool is_valid_linear_interpolate_points_array(Vector2f const * pts, unsigned int
   }
   return true;
 }
-
-float linear_interpolate(float var_value,Vector2f const * pts, unsigned int len)
+float linear_interpolate(float var_value,Vector2F const * pts, unsigned int len)
 {
     // at or below xmin
     if ( var_value <= pts[0].x){
