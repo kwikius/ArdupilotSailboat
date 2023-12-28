@@ -48,29 +48,92 @@ Sailboat::Sailboat(const char *frame_str) :
     lock_step_scheduled = true;
 }
 
+namespace{
+
+   // vector of { angle in degrees, CL
+   Vector2F constexpr CL_curve[] =
+   {
+     {0.f, 0.f),
+     {10.f, 0.5f},
+     {20.f, 1.f},
+     {30.f, 1.1f},
+     {40.f, 0.95f},
+     {50.f, 0.75f},
+     {60.f, 0.6f},
+     {70.f, 0.4f},
+     {80.f, 0.2f},
+     {90.f, 0.0f},
+     // these should be less in magnitude
+     {100.f, -0.2f},
+     {110.f, -0.4f}
+     {120.f, -0.6f},
+     {130.f, -0.75f},
+     {140.f, -0.95f}
+     {150.f, -1.1f},
+     {160.f, -1.f}
+     {170.f, -0.5f},
+     // should probably continue 360 degreees here..
+   };
+
+ Vector2F constexpr CD_curve[] =
+   {
+     {0.f, 0.1f),
+     {10.f, 0.1f},
+     {20.f, 0.2f},
+     {30.f, 0.4f},
+     {40.f, 0.8f},
+     {50.f, 1.2f},
+     {60.f, 1.5f},
+     {70.f, 1.7f},
+     {80.f, 1.9f},
+     {90.f, 1.95f},
+     {100.f, 1.9f},
+     {110.f, 1.7f}
+     {120.f, 1.5f},
+     {130.f, 1.2f},
+     {140.f, 0.8f}
+     {150.f, 0.4f},
+     {160.f, 0.2f}
+     {170.f, 0.1f},
+     // should probably continue 360 degreees here..
+   };
+
+
+
+}
+
 // calculate the lift and drag as values from 0 to 1
 // given an apparent wind speed in m/s and angle-of-attack in degrees
+// calculate Lift force (perpendicular to wind direction) and Drag force (parallel to wind direction)
 void Sailboat::calc_lift_and_drag(float wind_speed, float angle_of_attack_deg, float& lift, float& drag) const
 {
-    const uint16_t index_width_deg = 10;
-    const uint8_t index_max = ARRAY_SIZE(lift_curve) - 1;
-
-    // Convert to expected range
+        // Convert to expected range
     angle_of_attack_deg = wrap_180(angle_of_attack_deg);
+
+    constexpr int32_t index_min = 0;
+    constexpr int32_t index_width_deg = 10;
+    constexpr int32_t index_max = ARRAY_SIZE(lift_curve) - 1;
 
     // assume a symmetrical airfoil
     const float aoa = fabs(angle_of_attack_deg);
+    constexpr float min_aoa = 0.f;
+    constexpr float max_aoa = index_width_deg * index_max ;
+    const float aoa_clamped = std::clamp(aoa,min_aoa,max_aoa);
+
+    int32_t const index = std::clamp(static_cast(int32_t)(aoa_clamped / index_width_deg),0,index_max);
 
     // check extremes
-    if (aoa <= 0.0f) {
-        lift = lift_curve[0];
-        drag = drag_curve[0];
-    } else if (aoa >= index_max * index_width_deg) {
-        lift = lift_curve[index_max];
-        drag = drag_curve[index_max];
-    } else {
-        uint8_t index = constrain_int16(aoa / index_width_deg, 0, index_max);
-        float remainder = aoa - (index * index_width_deg);
+
+//    if (aoa <= 0.0f) {
+//        lift = lift_curve[0];
+//        drag = drag_curve[0];
+//    } else if (aoa >= index_max * index_width_deg) {
+//        lift = lift_curve[index_max];
+//        drag = drag_curve[index_max];
+//    } else {
+       // uint8_t index = constrain_int16(aoa / index_width_deg, 0, index_max);
+// float low_output, float high_output,float var_value,float var_low, float var_high);
+        float const remainder = aoa - (index * index_width_deg);
         lift = linear_interpolate(lift_curve[index], lift_curve[index+1], remainder, 0.0f, index_width_deg);
         drag = linear_interpolate(drag_curve[index], drag_curve[index+1], remainder, 0.0f, index_width_deg);
     }
@@ -126,10 +189,10 @@ void Sailboat::update_wave(float delta_time)
     // apply rate propositional to error between boat angle and water angle
     // this gives a 'stability' effect
     float r, p, y;
-    dcm.to_euler(&r, &p, &y); 
+    dcm.to_euler(&r, &p, &y);
 
     // if not armed don't do waves, to allow gyro init
-    if (sitl->wave.enable == 0 || !hal.util->get_soft_armed() || is_zero(wave_amp) ) { 
+    if (sitl->wave.enable == 0 || !hal.util->get_soft_armed() || is_zero(wave_amp) ) {
         wave_gyro = Vector3f(-r,-p,0.0f) * WAVE_ANGLE_GAIN;
         wave_heave = -velocity_ef.z * WAVE_HEAVE_GAIN;
         wave_phase = 0.0f;
@@ -185,12 +248,14 @@ void Sailboat::update(const struct sitl_input &input)
     // Note than the SITL wind direction is defined as the direction the wind is travelling to
     // This is accounted for in these calculations
     Vector3f wind_apparent_ef = velocity_ef - wind_ef;
+    // earth frame apparent wind direction
     const float wind_apparent_dir_ef = degrees(atan2f(wind_apparent_ef.y, wind_apparent_ef.x));
     const float wind_apparent_speed = safe_sqrt(sq(wind_apparent_ef.x)+sq(wind_apparent_ef.y));
 
     float roll, pitch, yaw;
     dcm.to_euler(&roll, &pitch, &yaw);
 
+    // boat frame apparent wind direction
     const float wind_apparent_dir_bf = wrap_180(wind_apparent_dir_ef - degrees(yaw));
 
     // set RPM and airspeed from wind speed, allows to test RPM and Airspeed wind vane back end in SITL
