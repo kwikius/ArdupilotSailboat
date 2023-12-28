@@ -48,12 +48,11 @@ Sailboat::Sailboat(const char *frame_str) :
     lock_step_scheduled = true;
 }
 
-namespace{
-
-   // vector of { angle in degrees, CL
+namespace {
+   // vector of { angle in degrees, CL}
    Vector2F constexpr CL_curve[] =
    {
-     {0.f, 0.f),
+     {0.f, 0.f},
      {10.f, 0.5f},
      {20.f, 1.f},
      {30.f, 1.1f},
@@ -63,21 +62,22 @@ namespace{
      {70.f, 0.4f},
      {80.f, 0.2f},
      {90.f, 0.0f},
-     // these should be less in magnitude
+     // thes below should probably be less in magnitude
      {100.f, -0.2f},
-     {110.f, -0.4f}
+     {110.f, -0.4f},
      {120.f, -0.6f},
      {130.f, -0.75f},
-     {140.f, -0.95f}
+     {140.f, -0.95f},
      {150.f, -1.1f},
-     {160.f, -1.f}
+     {160.f, -1.f},
      {170.f, -0.5f},
      // should probably continue 360 degreees here..
    };
 
+// vector of { angle in degrees, CD}
  Vector2F constexpr CD_curve[] =
    {
-     {0.f, 0.1f),
+     {0.f, 0.1f},
      {10.f, 0.1f},
      {20.f, 0.2f},
      {30.f, 0.4f},
@@ -88,18 +88,15 @@ namespace{
      {80.f, 1.9f},
      {90.f, 1.95f},
      {100.f, 1.9f},
-     {110.f, 1.7f}
+     {110.f, 1.7f},
      {120.f, 1.5f},
      {130.f, 1.2f},
-     {140.f, 0.8f}
+     {140.f, 0.8f},
      {150.f, 0.4f},
-     {160.f, 0.2f}
-     {170.f, 0.1f},
+     {160.f, 0.2f},
+     {170.f, 0.1f}
      // should probably continue 360 degreees here..
    };
-
-
-
 }
 
 // calculate the lift and drag as values from 0 to 1
@@ -109,42 +106,20 @@ void Sailboat::calc_lift_and_drag(float wind_speed, float angle_of_attack_deg, f
 {
         // Convert to expected range
     angle_of_attack_deg = wrap_180(angle_of_attack_deg);
+    const float abs_aoa_deg = fabs(angle_of_attack_deg);
 
-    constexpr int32_t index_min = 0;
-    constexpr int32_t index_width_deg = 10;
-    constexpr int32_t index_max = ARRAY_SIZE(lift_curve) - 1;
+    float const cl = linear_interpolate(abs_aoa_deg, CL_curve, ARRAY_SIZE(CL_curve));
+    float const cd = linear_interpolate(abs_aoa_deg, CD_curve, ARRAY_SIZE(CD_curve));
 
-    // assume a symmetrical airfoil
-    const float aoa = fabs(angle_of_attack_deg);
-    constexpr float min_aoa = 0.f;
-    constexpr float max_aoa = index_width_deg * index_max ;
-    const float aoa_clamped = std::clamp(aoa,min_aoa,max_aoa);
-
-    int32_t const index = std::clamp(static_cast(int32_t)(aoa_clamped / index_width_deg),0,index_max);
-
-    // check extremes
-
-//    if (aoa <= 0.0f) {
-//        lift = lift_curve[0];
-//        drag = drag_curve[0];
-//    } else if (aoa >= index_max * index_width_deg) {
-//        lift = lift_curve[index_max];
-//        drag = drag_curve[index_max];
-//    } else {
-       // uint8_t index = constrain_int16(aoa / index_width_deg, 0, index_max);
-// float low_output, float high_output,float var_value,float var_low, float var_high);
-        float const remainder = aoa - (index * index_width_deg);
-        lift = linear_interpolate(lift_curve[index], lift_curve[index+1], remainder, 0.0f, index_width_deg);
-        drag = linear_interpolate(drag_curve[index], drag_curve[index+1], remainder, 0.0f, index_width_deg);
-    }
-
+    auto const f_max = wind_speed * wind_speed * sail_area;
     // apply scaling by wind speed
-    lift *= wind_speed * sail_area;
-    drag *= wind_speed * sail_area;
+    drag  = cd * f_max;
 
     if (is_negative(angle_of_attack_deg)) {
         // invert lift for negative aoa
-        lift *= -1;
+      lift = -cl * f_max;
+    }else{
+       lift = cl * f_max;
     }
 }
 
@@ -255,9 +230,9 @@ void Sailboat::update(const struct sitl_input &input)
     float roll, pitch, yaw;
     dcm.to_euler(&roll, &pitch, &yaw);
 
-    // boat frame apparent wind direction
+    // body frame apparent wind direction
     const float wind_apparent_dir_bf = wrap_180(wind_apparent_dir_ef - degrees(yaw));
-
+    const int wind_apparent_dir_bf_sign = is_negative(wind_apparent_dir_bf)?-1:1;
     // set RPM and airspeed from wind speed, allows to test RPM and Airspeed wind vane back end in SITL
     rpm[0] = wind_apparent_speed;
     airspeed_pitot = wind_apparent_speed;
@@ -276,12 +251,12 @@ void Sailboat::update(const struct sitl_input &input)
         float mainsail_angle_bf = constrain_float((input.servos[MAINSAIL_SERVO_CH]-1000)/1000.0f * 90.0f, 0.0f, 90.0f);
 
         // calculate angle-of-attack from wind to mainsail, cannot have negative angle of attack, sheet would go slack
-        aoa_deg = MAX(fabsf(wind_apparent_dir_bf) - mainsail_angle_bf, 0);
+        aoa_deg = MAX(fabsf(wind_apparent_dir_bf) - mainsail_angle_bf, 0) * wind_apparent_dir_bf_sign;
 
-        if (is_negative(wind_apparent_dir_bf)) {
-            // take into account the current tack
-            aoa_deg *= -1;
-        }
+//        if (is_negative(wind_apparent_dir_bf)) {
+//            // take into account the current tack
+//            aoa_deg *= -1;
+//        }
 
     }
 
@@ -295,16 +270,16 @@ void Sailboat::update(const struct sitl_input &input)
     const float force_fwd = (lift_wf * sin_rot_rad) - (drag_wf * cos_rot_rad);
 
     // how much time has passed?
-    float delta_time = frame_time_us * 1.0e-6f;
+    float const delta_time = frame_time_us * 1.0e-6f;
 
     // speed in m/s in body frame
     Vector3f velocity_body = dcm.transposed() * velocity_ef_water;
 
     // speed along x axis, +ve is forward
-    float speed = velocity_body.x;
-
+    float const speed = velocity_body.x;
+    int const speed_sign = is_negative(speed)?-1:1;
     // yaw rate in degrees/s
-    float yaw_rate = get_yaw_rate(steering, speed);
+    float const yaw_rate = get_yaw_rate(steering, speed);
 
     gyro = Vector3f(0,0,radians(yaw_rate)) + wave_gyro;
 
@@ -313,10 +288,10 @@ void Sailboat::update(const struct sitl_input &input)
     dcm.normalize();
 
     // hull drag
-    float hull_drag = sq(speed) * 0.5f;
-    if (!is_positive(speed)) {
-        hull_drag *= -1.0f;
-    }
+    float const hull_drag = sq(speed) * 0.5f * speed_sign;
+//    if (!is_positive(speed)) {
+//        hull_drag *= -1.0f;
+//    }
 
     // throttle force (for motor sailing)
     // gives throttle force == hull drag at 10m/s
