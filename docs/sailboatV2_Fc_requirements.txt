@@ -1,0 +1,15 @@
+
+
+Sailboat fc requirements
+
+
+RC outputs:   winch , rudder, foil *4 , sail trim  --> 7
+Serial:  telem
+Serial: GPS
+Serial:  sensorBus  Wind Sensor
+
+Analog Wind speed, wind direction, Batt voltage
+
+RC in
+
+
