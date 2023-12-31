@@ -220,7 +220,7 @@ void Sailboat::update_wave(float delta_time)
 **/
 float Sailboat::get_heel_angular_acceleration(float force_heel, float current_roll_angle, float current_roll_rate)const
 {
-   float vertical_ce = 100.f;
+   float vertical_ce =200.f;
 
    float const keel_mass = 1.f;  // kg
    float const keel_depth = 1.f;  // m
@@ -231,7 +231,7 @@ float Sailboat::get_heel_angular_acceleration(float force_heel, float current_ro
 
    float const resultant = overturning_moment - righting_moment;
    float const moment_of_inertia = 50000.f;
-   float const kdamping = 0.f;
+   float const kdamping = 10.f;
    return (resultant / moment_of_inertia) * (1.f / (( sq(current_roll_rate)* kdamping) +1));
 
 }
