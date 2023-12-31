@@ -91,6 +91,15 @@ inline bool is_negative(const double fVal1) {
     return (fVal1 <= static_cast<double>((-1.0 * FLT_EPSILON)));
 }
 
+template <typename Arith>
+constexpr inline Arith signum( Arith const value){
+   return ( is_positive(value) )
+        ? static_cast<Arith>(1)
+        :  (is_negative(value))
+           ? static_cast<Arith>(-1)
+           : static_cast<Arith>(0);
+}
+
 /*
  * A variant of asin() that checks the input ranges and ensures a valid angle
  * as output. If nan is given as input then zero is returned.

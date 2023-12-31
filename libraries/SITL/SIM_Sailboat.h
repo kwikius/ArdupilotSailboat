@@ -45,7 +45,8 @@ protected:
 
 private:
 
-    // calculate the lift and drag as values from 0 to 1 given an apparent wind speed in m/s and angle-of-attack in degrees
+    // calculate the lift and drag as values from 0 to 1 given an apparent wind speed in m/s
+    // and angle-of-attack in degrees
     void calc_lift_and_drag(float wind_speed, float angle_of_attack_deg, float& lift, float& drag) const;
 
     // return turning circle (diameter) in meters for steering angle proportion in the range -1 to +1
