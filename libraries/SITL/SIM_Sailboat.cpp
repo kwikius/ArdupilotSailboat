@@ -104,35 +104,33 @@ namespace {
 * given an apparent wind speed in m/s and angle-of-attack in degrees
 * calculate Lift force (perpendicular to wind direction) and Drag force (parallel to wind direction)
 **/
-void Sailboat::calc_lift_and_drag(float wind_speed, float angle_of_attack_deg, float& lift, float& drag) const
+void Sailboat::calc_lift_and_drag(float wind_speed_m_per_s, float angle_of_attack_deg, float& lift, float& drag) const
 {
-    // Convert angle of attack to expected range for interpoltion curves
+    // Convert angle of attack to expected range for interpolation curves
     // ( +180 deg to - 180 deg )
-    angle_of_attack_deg = wrap_180(angle_of_attack_deg);
-    //int const angle_off_attack_sign = is_negative(angle_of_attack_deg)? -1 : 1;
-    const float abs_aoa_deg = fabs(angle_of_attack_deg);
+    const float signed_aoa_deg = wrap_180(angle_of_attack_deg);
+
+    const float abs_aoa_deg = fabs(signed_aoa_deg);
 
     float const cl = linear_interpolate(abs_aoa_deg, CL_curve, ARRAY_SIZE(CL_curve));
     float const cd = linear_interpolate(abs_aoa_deg, CD_curve, ARRAY_SIZE(CD_curve));
 
-    // Lift equation FL = 1/2 * Cl * rho * wind_speed^2 * sail_area
-    // Drag equation FD = 1/2 * Cd * rho * wind_speed^2 * sail_area
-    // here we currently use quasi units for the variables common to both equations
+    // Lift equation FL = 1/2 * Cl * rho * wind_speed_m_per_s^2 * sail_area
+    // Drag equation FD = 1/2 * Cd * rho * wind_speed_m_per_s^2 * sail_area
+    // here we currently use quasi units for the coefficients common to both equations
     // TODO convert to actual si values
-    auto const f_max = wind_speed * wind_speed * sail_area;
+    // need rho -> air density in kg.m-3
+    // actual sail area in m2
+    // actual wind speed in m.s-1
+    float const common_coefficient = wind_speed_m_per_s * wind_speed_m_per_s * sail_area;
     // force in direction of wind
-    drag  = cd * f_max;
+    drag = cd * common_coefficient;
     // force normal to direction of wind
-    lift = cl * f_max * signum(angle_of_attack_deg);
-//    if (is_negative(angle_of_attack_deg)) {
-//        // invert lift for negative aoa
-//      lift = -cl * f_max;
-//    }else{
-//       lift = cl * f_max;
-//    }
+    lift = cl * common_coefficient * signum(signed_aoa_deg);
+
 }
 
-// return turning circle (diameter) in meters for steering angle proportion in the range -1 to +1
+// return turning circle (diameter) in meters for steering proportion in the range -1 to +1
 float Sailboat::get_turn_circle(float steering) const
 {
     if (is_zero(steering)) {
@@ -147,11 +145,11 @@ float Sailboat::get_yaw_rate(float steering, float speed) const
     if (is_zero(steering) || is_zero(speed)) {
         return 0;
     }
-    float d = get_turn_circle(steering);
-    float c = M_PI * d;
-    float t = c / speed;
-    float rate = 360.0f / t;
-    return rate;
+    float const d_m = get_turn_circle(steering); // turn circle in meters
+    float const c_m = M_PI * d_m; // circumference
+    float const t_s = c_m / speed;  //
+    float const yaw_rate_deg_per_sec = 360.0f / t_s;
+    return yaw_rate_deg_per_sec;
 }
 
 // return lateral acceleration in m/s/s given a steering input (in the range -1 to +1) and speed in m/s
@@ -217,6 +215,27 @@ void Sailboat::update_wave(float delta_time)
     }
 }
 
+/**
+  @brief return a heel angualr acceleration
+**/
+float Sailboat::get_heel_angular_acceleration(float force_heel, float current_roll_angle, float current_roll_rate)const
+{
+   float vertical_ce = 100.f;
+
+   float const keel_mass = 1.f;  // kg
+   float const keel_depth = 1.f;  // m
+   float const g = 9.8f;           // should be 9.8 !
+   float const righting_moment = keel_mass * g * keel_depth * sinf(current_roll_angle);
+
+   float const overturning_moment = force_heel * vertical_ce * cosf(current_roll_angle);
+
+   float const resultant = overturning_moment - righting_moment;
+   float const moment_of_inertia = 50000.f;
+   float const kdamping = 0.f;
+   return (resultant / moment_of_inertia) * (1.f / (( sq(current_roll_rate)* kdamping) +1));
+
+}
+
 /*
   update the sailboat simulation by one time step
  */
@@ -241,8 +260,8 @@ void Sailboat::update(const struct sitl_input &input)
     dcm.to_euler(&roll, &pitch, &yaw);
 
     // body frame apparent wind direction
-    const float wind_apparent_dir_bf = wrap_180(wind_apparent_dir_ef - degrees(yaw));
-    const int wind_apparent_dir_bf_sign = is_negative(wind_apparent_dir_bf)?-1:1;
+    const float wind_apparent_dir_bf_signed = wrap_180(wind_apparent_dir_ef - degrees(yaw));
+
     // set RPM and airspeed from wind speed, allows to test RPM and Airspeed wind vane back end in SITL
     rpm[0] = wind_apparent_speed;
     airspeed_pitot = wind_apparent_speed;
@@ -252,7 +271,7 @@ void Sailboat::update(const struct sitl_input &input)
         // directly actuated wing
         float wing_angle_bf = constrain_float((input.servos[DIRECT_WING_SERVO_CH]-1500)/500.0f * 90.0f, -90.0f, 90.0f);
 
-        aoa_deg = wind_apparent_dir_bf - wing_angle_bf;
+        aoa_deg = wind_apparent_dir_bf_signed - wing_angle_bf;
 
     } else {
         // mainsail with sheet
@@ -261,12 +280,7 @@ void Sailboat::update(const struct sitl_input &input)
         float mainsail_angle_bf = constrain_float((input.servos[MAINSAIL_SERVO_CH]-1000)/1000.0f * 90.0f, 0.0f, 90.0f);
 
         // calculate angle-of-attack from wind to mainsail, cannot have negative angle of attack, sheet would go slack
-        aoa_deg = MAX(fabsf(wind_apparent_dir_bf) - mainsail_angle_bf, 0) * wind_apparent_dir_bf_sign;
-
-//        if (is_negative(wind_apparent_dir_bf)) {
-//            // take into account the current tack
-//            aoa_deg *= -1;
-//        }
+        aoa_deg = MAX(fabsf(wind_apparent_dir_bf_signed) - mainsail_angle_bf, 0) * signum(wind_apparent_dir_bf_signed);
 
     }
 
@@ -275,15 +289,10 @@ void Sailboat::update(const struct sitl_input &input)
     calc_lift_and_drag(wind_apparent_speed, aoa_deg, lift_wf, drag_wf);
 
     // rotate lift and drag from wind frame into body frame
-    const float sin_rot_rad = sinf(radians(wind_apparent_dir_bf));
-    const float cos_rot_rad = cosf(radians(wind_apparent_dir_bf));
-    const float force_fwd = (lift_wf * sin_rot_rad) - (drag_wf * cos_rot_rad);
-
-    const float force_heel = (lift_wf * cos_rot_rad) ; //- (drag_wf * sin_rot_rad);
-
-    constexpr float k_pitch = 0.05;
-
-    float heel_angle = constrain_float(force_heel * k_pitch,-45.f,45.f);
+    const float sin_rot_rad = sinf(radians(wind_apparent_dir_bf_signed));
+    const float cos_rot_rad = cosf(radians(wind_apparent_dir_bf_signed));
+    const float force_fwd = lift_wf * sin_rot_rad - drag_wf * cos_rot_rad;
+    const float force_heel = lift_wf * cos_rot_rad + drag_wf * sin_rot_rad;
 
     // how much time has passed?
     float const delta_time = frame_time_us * 1.0e-6f;
@@ -293,26 +302,19 @@ void Sailboat::update(const struct sitl_input &input)
 
     // speed along x axis, +ve is forward
     float const speed = velocity_body.x;
-    int const speed_sign = is_negative(speed)?-1:1;
     // yaw rate in degrees/s
     float const yaw_rate = get_yaw_rate(steering, speed);
 
-    gyro = Vector3f(0,0,radians(yaw_rate)) + wave_gyro;
+    float const roll_rate = gyro.x - get_heel_angular_acceleration(force_heel,roll, gyro.x);
+
+    gyro = Vector3f(roll_rate,0,radians(yaw_rate)) + wave_gyro;
 
     // update attitude
     dcm.rotate(gyro * delta_time);
     dcm.normalize();
 
-    dcm.to_euler(&roll, &pitch, &yaw);
-    roll = radians(heel_angle);
-    dcm.from_euler(roll,pitch,yaw);
-    dcm.normalize();
-
     // hull drag
-    float const hull_drag = sq(speed) * 0.5f * speed_sign;
-//    if (!is_positive(speed)) {
-//        hull_drag *= -1.0f;
-//    }
+    float const hull_drag = sq(speed) * 0.5f * signum(speed);
 
     // throttle force (for motor sailing)
     // gives throttle force == hull drag at 10m/s
