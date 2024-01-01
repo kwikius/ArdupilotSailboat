@@ -44,6 +44,7 @@ Sailboat::Sailboat(const char *frame_str) :
     turning_circle(1.8),
     sail_area(1.0)
 {
+    Aircraft::mass = 4.0;  // kg
     motor_connected = (strcmp(frame_str, "sailboat-motor") == 0);
     lock_step_scheduled = true;
 }
@@ -218,13 +219,13 @@ void Sailboat::update_wave(float delta_time)
 /**
   @brief return a heel angular acceleration in rad.s-2
 **/
-float Sailboat::get_heel_angular_acceleration(float force_heel, float current_roll_angle_bf_rad, float current_roll_rate)const
+float Sailboat::get_heel_angular_acceleration(float force_heel, float current_roll_angle_bf_rad, float current_roll_rate_rad_per_s2)const
 {
    // no  angular acceleration during gyro init
    if ( !hal.util->get_soft_armed()){
-     return 0.f;
+       return 0.f;
    }
-   float vertical_ce = 60.f; // m
+   float vertical_ce = 200.f; // m
 
    float const keel_mass = 2.5f;  // kg
    float const keel_depth = 0.5f;  // m
@@ -237,13 +238,13 @@ float Sailboat::get_heel_angular_acceleration(float force_heel, float current_ro
    // Force = area * 1/2 v^2 * cd * rho
    // moment = force * dist
    // kDamping = cd *rho ideally
-   float const kDamping = 0.02f;
+   float const kDamping = 0.4f;
 
    float const damping_moment =
-     -1.f * sq(keel_depth) * keel_chord * sq(current_roll_rate) * kDamping * signum(current_roll_rate);
+     -1.f * sq(keel_depth) * keel_chord * current_roll_rate_rad_per_s2 * kDamping ;
 
    float const resultant = overturning_moment + righting_moment + damping_moment;
-   float const kMomentOfInertia = 20;
+   float const kMomentOfInertia = 100.f;
    float const moment_of_inertia = keel_mass * sq(keel_depth) * kMomentOfInertia;  // mass * d^2
 
 
@@ -329,7 +330,10 @@ void Sailboat::update(const struct sitl_input &input)
     dcm.normalize();
 
     // hull drag
-    float const hull_drag = sq(speed) * 0.5f * signum(speed);
+    // waveDrag
+    // skinFriction drag
+    float constexpr hullDragGain = 0.5f;
+    float const hull_drag = sq(speed) * Aircraft::mass * hullDragGain * signum(speed);
 
     // throttle force (for motor sailing)
     // gives throttle force == hull drag at 10m/s
@@ -341,7 +345,7 @@ void Sailboat::update(const struct sitl_input &input)
 
     // accel in body frame due acceleration from sail and deceleration from hull friction
     accel_body = Vector3f((throttle_force + force_fwd) - hull_drag, 0, 0);
-    accel_body /= mass;
+    accel_body /= Aircraft::mass;
 
     // add in accel due to direction change
     accel_body.y += radians(yaw_rate) * speed;

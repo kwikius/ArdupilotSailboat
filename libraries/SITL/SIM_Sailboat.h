@@ -24,6 +24,7 @@ namespace SITL {
 
 /*
   a sailboat simulator
+  called on SITL_cmdline by adding "sailboat" to cmdline
  */
 class Sailboat : public Aircraft {
 public:
@@ -47,7 +48,7 @@ private:
 
     // calculate the lift and drag as values from 0 to 1 given an apparent wind speed in m/s
     // and angle-of-attack in degrees
-    void calc_lift_and_drag(float wind_speed, float angle_of_attack_deg, float& lift, float& drag) const;
+    void calc_lift_and_drag(float wind_speed_m_per_s, float angle_of_attack_deg, float& lift, float& drag) const;
 
     // return turning circle (diameter) in meters for steering angle proportion in the range -1 to +1
     float get_turn_circle(float steering) const;
@@ -55,9 +56,9 @@ private:
     // return yaw rate in deg/sec given a steering input (in the range -1 to +1) and speed in m/s
     float get_yaw_rate(float steering, float speed) const;
 
-    // return roll angualr acceleration in rad/s/s
+    // return roll angular acceleration in rad/s/s
     // from heel force and current roll angle
-    float get_heel_angular_acceleration(float force_heel, float current_roll_angle,float current_roll_rate)const;
+    float get_heel_angular_acceleration(float force_heel_N, float current_roll_angle_bf_rad,float current_roll_rate)const;
 
     // return lateral acceleration in m/s/s given a steering input (in the range -1 to +1) and speed in m/s
     float get_lat_accel(float steering, float speed) const;
@@ -73,7 +74,7 @@ private:
  //   const float lift_curve[18] = {0.00f, 0.50f, 1.00f, 1.10f, 0.95f, 0.75f, 0.60f, 0.40f, 0.20f, 0.00f, -0.20f, -0.40f, -0.60f, -0.75f, -0.95f, -1.10f, -1.00f, -0.50f};
   //  const float drag_curve[18] = {0.10f, 0.10f, 0.20f, 0.40f, 0.80f, 1.20f, 1.50f, 1.70f, 1.90f, 1.95f,  1.90f,  1.70f,  1.50f,  1.20f,  0.80f,  0.40f,  0.20f,  0.10f};
 
-    const float mass = 2.0f;
+   // const float mass = 2.0f;  // kg
 
     Vector3f velocity_ef_water; // m/s
     Vector3f wave_gyro;         // rad/s
