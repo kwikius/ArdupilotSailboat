@@ -216,23 +216,38 @@ void Sailboat::update_wave(float delta_time)
 }
 
 /**
-  @brief return a heel angualr acceleration
+  @brief return a heel angular acceleration in rad.s-2
 **/
-float Sailboat::get_heel_angular_acceleration(float force_heel, float current_roll_angle, float current_roll_rate)const
+float Sailboat::get_heel_angular_acceleration(float force_heel, float current_roll_angle_bf_rad, float current_roll_rate)const
 {
-   float vertical_ce =200.f;
+   // no  angular acceleration during gyro init
+   if ( !hal.util->get_soft_armed()){
+     return 0.f;
+   }
+   float vertical_ce = 60.f; // m
 
-   float const keel_mass = 1.f;  // kg
-   float const keel_depth = 1.f;  // m
-   float const g = 9.8f;           // should be 9.8 !
-   float const righting_moment = keel_mass * g * keel_depth * sinf(current_roll_angle);
+   float const keel_mass = 2.5f;  // kg
+   float const keel_depth = 0.5f;  // m
+   float const keel_chord = 0.1f;  // m
+   float const g = 1.f;          // acceleration due to gravity m.s-2
+   float const overturning_moment = force_heel * vertical_ce * cosf(current_roll_angle_bf_rad);
+   float const righting_moment = -1.f * keel_mass * g * keel_depth * sinf(current_roll_angle_bf_rad);
+   // damping drag as a result of drag of water on keel as it rotates
+   // proportional to area and depth of keel and current rool rate
+   // Force = area * 1/2 v^2 * cd * rho
+   // moment = force * dist
+   // kDamping = cd *rho ideally
+   float const kDamping = 0.02f;
 
-   float const overturning_moment = force_heel * vertical_ce * cosf(current_roll_angle);
+   float const damping_moment =
+     -1.f * sq(keel_depth) * keel_chord * sq(current_roll_rate) * kDamping * signum(current_roll_rate);
 
-   float const resultant = overturning_moment - righting_moment;
-   float const moment_of_inertia = 50000.f;
-   float const kdamping = 10.f;
-   return (resultant / moment_of_inertia) * (1.f / (( sq(current_roll_rate)* kdamping) +1));
+   float const resultant = overturning_moment + righting_moment + damping_moment;
+   float const kMomentOfInertia = 20;
+   float const moment_of_inertia = keel_mass * sq(keel_depth) * kMomentOfInertia;  // mass * d^2
+
+
+   return (resultant / moment_of_inertia) ;
 
 }
 
@@ -266,18 +281,18 @@ void Sailboat::update(const struct sitl_input &input)
     rpm[0] = wind_apparent_speed;
     airspeed_pitot = wind_apparent_speed;
 
+    // sail angle of attack
     float aoa_deg = 0.0f;
     if (sitl->sail_type.get() == 1) {
         // directly actuated wing
-        float wing_angle_bf = constrain_float((input.servos[DIRECT_WING_SERVO_CH]-1500)/500.0f * 90.0f, -90.0f, 90.0f);
+        float const wing_angle_bf = constrain_float((input.servos[DIRECT_WING_SERVO_CH]-1500)/500.0f * 90.0f, -90.0f, 90.0f);
 
         aoa_deg = wind_apparent_dir_bf_signed - wing_angle_bf;
 
     } else {
         // mainsail with sheet
-
         // calculate mainsail angle from servo output 4, 0 to 90 degrees
-        float mainsail_angle_bf = constrain_float((input.servos[MAINSAIL_SERVO_CH]-1000)/1000.0f * 90.0f, 0.0f, 90.0f);
+        float const mainsail_angle_bf = constrain_float((input.servos[MAINSAIL_SERVO_CH]-1000)/1000.0f * 90.0f, 0.0f, 90.0f);
 
         // calculate angle-of-attack from wind to mainsail, cannot have negative angle of attack, sheet would go slack
         aoa_deg = MAX(fabsf(wind_apparent_dir_bf_signed) - mainsail_angle_bf, 0) * signum(wind_apparent_dir_bf_signed);
@@ -305,7 +320,7 @@ void Sailboat::update(const struct sitl_input &input)
     // yaw rate in degrees/s
     float const yaw_rate = get_yaw_rate(steering, speed);
 
-    float const roll_rate = gyro.x - get_heel_angular_acceleration(force_heel,roll, gyro.x);
+    float const roll_rate = gyro.x - get_heel_angular_acceleration(force_heel,roll, gyro.x) * delta_time;
 
     gyro = Vector3f(roll_rate,0,radians(yaw_rate)) + wave_gyro;
 
