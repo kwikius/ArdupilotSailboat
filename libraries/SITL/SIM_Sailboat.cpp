@@ -42,7 +42,7 @@ Sailboat::Sailboat(const char *frame_str) :
     Aircraft(frame_str),
     steering_angle_max(35),
     turning_circle(1.8),
-    sail_area(1.0)
+    sail_area(1.5)
 {
     Aircraft::mass = 4.0;  // kg
     motor_connected = (strcmp(frame_str, "sailboat-motor") == 0);
@@ -54,14 +54,14 @@ namespace {
    Vector2F constexpr CL_curve[] =
    {
      {0.f, 0.f},
-     {10.f, 0.5f},
-     {20.f, 1.f},
-     {30.f, 1.1f},
-     {40.f, 0.95f},
-     {50.f, 0.75f},
-     {60.f, 0.6f},
-     {70.f, 0.4f},
-     {80.f, 0.2f},
+     {10.f, 0.5f}, // 1
+     {20.f, 1.f},  // 2
+     {30.f, 1.1f},  // 2.2
+     {40.f, 0.95f}, // 1.
+     {50.f, 0.75f}, // 0.5
+     {60.f, 0.6f},   // 0.3
+     {70.f, 0.4f},   // 0.2
+     {80.f, 0.2f},   // 0.1
      {90.f, 0.0f},
      // thes below should probably be less in magnitude
      {100.f, -0.2f},
@@ -123,7 +123,8 @@ void Sailboat::calc_lift_and_drag(float wind_speed_m_per_s, float angle_of_attac
     // need rho -> air density in kg.m-3
     // actual sail area in m2
     // actual wind speed in m.s-1
-    float const common_coefficient = wind_speed_m_per_s * wind_speed_m_per_s * sail_area;
+    float air_density_kg_per_m3 = 1.225;
+    float const common_coefficient = 1./2. * air_density_kg_per_m3 * sq(wind_speed_m_per_s) * sail_area;
     // force in direction of wind
     drag = cd * common_coefficient;
     // force normal to direction of wind
@@ -219,7 +220,8 @@ void Sailboat::update_wave(float delta_time)
 /**
   @brief return a heel angular acceleration in rad.s-2
 **/
-float Sailboat::get_heel_angular_acceleration(float force_heel, float current_roll_angle_bf_rad, float current_roll_rate_rad_per_s2)const
+float Sailboat::get_heel_angular_acceleration(float force_heel,
+ float current_roll_angle_bf_rad, float current_roll_rate_rad_per_s)const
 {
    // no  angular acceleration during gyro init
    if ( !hal.util->get_soft_armed()){
@@ -238,13 +240,13 @@ float Sailboat::get_heel_angular_acceleration(float force_heel, float current_ro
    // Force = area * 1/2 v^2 * cd * rho
    // moment = force * dist
    // kDamping = cd *rho ideally
-   float const kDamping = 0.4f;
+   float const kDamping = 1.f;
 
    float const damping_moment =
-     -1.f * sq(keel_depth) * keel_chord * current_roll_rate_rad_per_s2 * kDamping ;
+     -1.f * sq(keel_depth) * keel_chord * current_roll_rate_rad_per_s * kDamping ;
 
    float const resultant = overturning_moment + righting_moment + damping_moment;
-   float const kMomentOfInertia = 100.f;
+   float const kMomentOfInertia = 300.f;
    float const moment_of_inertia = keel_mass * sq(keel_depth) * kMomentOfInertia;  // mass * d^2
 
 
