@@ -30,6 +30,10 @@ class Sailboat : public Aircraft {
 public:
     Sailboat(const char *frame_str);
 
+    struct Sail_type{
+       static constexpr uint8_t mainsail_with_sheet = 0U;
+       static constexpr uint8_t directly_actuated_wing = 1U;
+    };
     /* update model by one time step */
     void update(const struct sitl_input &input) override;
 
@@ -62,6 +66,8 @@ private:
 
     // return lateral acceleration in m/s/s given a steering input (in the range -1 to +1) and speed in m/s
     float get_lat_accel(float steering, float speed) const;
+
+    float get_mainsail_angle_bf(const struct sitl_input &input)const;
 
     // simulate waves and swell
     void update_wave(float delta_time);
