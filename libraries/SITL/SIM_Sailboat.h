@@ -42,7 +42,7 @@ public:
 
 protected:
     bool motor_connected;       // true if this frame has a motor
-    float sail_area; // 1.0 for normal area
+    float sail_area; // m2
 
 private:
 
