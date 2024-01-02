@@ -220,6 +220,9 @@ void Sailboat::update_wave(float delta_time)
 
 /**
   @brief return a heel angular acceleration in rad.s-2
+  @param[in] heel_force is the rolling force in N
+  @param[in] current_roll_angle_bf_rad is the current roll angle in radians
+  @param[in] current_roll_rate_rad_per_s is current roll rate in rad/s
 **/
 float Sailboat::get_heel_angular_acceleration(float force_heel,
  float current_roll_angle_bf_rad, float current_roll_rate_rad_per_s)const
@@ -228,6 +231,7 @@ float Sailboat::get_heel_angular_acceleration(float force_heel,
    if ( !hal.util->get_soft_armed()){
        return 0.f;
    }
+
    float vertical_ce = 200.f; // m
 
    float const keel_mass = 2.5f;  // kg
@@ -265,18 +269,11 @@ float Sailboat::get_mainsail_angle_bf(const struct sitl_input &input)const
     if ( sail_type == Sail_type::directly_actuated_wing) {
         // directly actuated wing
         return constrain_float((input.servos[DIRECT_WING_SERVO_CH]-1500)/500.0f * 90.0f, -90.0f, 90.0f);
-
-      //  aoa_deg = wind_apparent_dir_bf_signed_old - wing_angle_bf;
-
     } else {
         assert( sail_type == Sail_type::mainsail_with_sheet);
         // mainsail with sheet
         // calculate mainsail angle from servo output 4, 0 to 90 degrees
         return constrain_float((input.servos[MAINSAIL_SERVO_CH]-1000)/1000.0f * 90.0f, 0.0f, 90.0f);
-
-        // calculate angle-of-attack from wind to mainsail, cannot have negative angle of attack, sheet would go slack
-       // aoa_deg = MAX(fabsf(wind_apparent_dir_bf_signed_old) - mainsail_angle_bf, 0) * signum(wind_apparent_dir_bf_signed_old);
-
     }
     //return aoa_deg;
 }
@@ -302,25 +299,30 @@ void Sailboat::update(const struct sitl_input &input)
     // Note than the SITL wind direction is defined as the direction the wind is travelling to
     // This is accounted for in these calculations
     Vector3f const wind_apparent_ef = Aircraft::velocity_ef - Aircraft::wind_ef;
+
+#if (0)
     // earth frame apparent wind direction
     const float wind_apparent_dir_ef_old = degrees(atan2f(wind_apparent_ef.y, wind_apparent_ef.x));
     const float wind_apparent_speed_old = safe_sqrt(sq(wind_apparent_ef.x)+sq(wind_apparent_ef.y));
 
     float roll, pitch, yaw;
     dcm.to_euler(&roll, &pitch, &yaw);
-
+#endif
     // Rotate the vector to body frame vector wind_vector_bf using dcm
     // to wind vector seen by boat
     Vector3f const wind_apparent_bf = dcm.mul_transpose(wind_apparent_ef);
-    float const wind_apparent_dir_bf_signed1 = wrap_180(degrees(atan2(wind_apparent_bf.y,wind_apparent_bf.x)));
-    float const wind_apparent_speed1_m_per_s = safe_sqrt(sq(wind_apparent_bf.y)+sq(wind_apparent_bf.x));
+    float const wind_apparent_dir_bf_signed = wrap_180(degrees(atan2(wind_apparent_bf.y,wind_apparent_bf.x)));
+    //
+    float const wind_apparent_speed_bf = safe_sqrt(sq(wind_apparent_bf.y)+sq(wind_apparent_bf.x));
+
+#if 0
     // body frame apparent horizontal wind direction is atan2(wind_vector_bf.y,wind_vector_bf.x);
     // body frame wind speed is safe_sqrt(sq(wind_vector_bf.y) + sq(wind_vector_bf.x))
     const float wind_apparent_dir_bf_signed_old = wrap_180(wind_apparent_dir_ef_old - degrees(yaw));
-
+#endif
     // set RPM and airspeed from wind speed, allows to test RPM and Airspeed wind vane back end in SITL
-    rpm[0] = wind_apparent_speed_old;
-    airspeed_pitot = wind_apparent_speed_old;
+    rpm[0] = wind_apparent_speed_bf;
+    airspeed_pitot = wind_apparent_speed_bf;
 
     float const mainsail_angle_bf = get_mainsail_angle_bf(input);
 
@@ -328,43 +330,50 @@ void Sailboat::update(const struct sitl_input &input)
     float aoa_deg = 0.f ;
     if (sitl->sail_type.get() == Sail_type::directly_actuated_wing) {
         // directly actuated wing
-        aoa_deg = wind_apparent_dir_bf_signed_old - mainsail_angle_bf;
+        aoa_deg = wind_apparent_dir_bf_signed - mainsail_angle_bf;
     }else{
        // Sail_type::mainsail_with_sheet
         // Calculate angle-of-attack from wind to mainsail,
         // but cannot have negative angle of attack, sheet would go slack.
         aoa_deg =
-           MAX(fabsf(wind_apparent_dir_bf_signed_old) - mainsail_angle_bf, 0) *
-              signum(wind_apparent_dir_bf_signed_old);
+           MAX(fabsf(wind_apparent_dir_bf_signed) - mainsail_angle_bf, 0) *
+              signum(wind_apparent_dir_bf_signed);
     }
 
     // calculate Lift force (perpendicular to wind direction) and Drag force (parallel to wind direction)
     float lift_wf, drag_wf;
-    calc_lift_and_drag(wind_apparent_speed_old, aoa_deg, lift_wf, drag_wf);
+    calc_lift_and_drag(wind_apparent_speed_bf, aoa_deg, lift_wf, drag_wf);
 
     // rotate lift and drag from wind frame into body frame
-    const float sin_rot_rad = sinf(radians(wind_apparent_dir_bf_signed_old));
-    const float cos_rot_rad = cosf(radians(wind_apparent_dir_bf_signed_old));
+    const float sin_rot_rad = sinf(radians(wind_apparent_dir_bf_signed));
+    const float cos_rot_rad = cosf(radians(wind_apparent_dir_bf_signed));
     const float force_fwd = lift_wf * sin_rot_rad - drag_wf * cos_rot_rad;
     const float force_heel = lift_wf * cos_rot_rad + drag_wf * sin_rot_rad;
 
     // how much time has passed?
     float const delta_time = frame_time_us * 1.0e-6f;
     update_time_s += delta_time;
-    if ( (update_time_s - last_print_time_s) > 10.f){
-       last_print_time_s = update_time_s;
-       printf("wind apparent dir old %f, new %f\n",wind_apparent_dir_bf_signed_old,wind_apparent_dir_bf_signed1);
-       printf("wind apparent speed old %f, new %f\n",wind_apparent_speed_old,wind_apparent_speed1_m_per_s);
-    }
-    // speed in m/s in body frame
-    Vector3f velocity_body = dcm.transposed() * velocity_ef_water;
 
+    // speed in m/s in body frame
+    Vector3f const velocity_body = dcm.transposed() * velocity_ef_water;
+
+    //create a vertical component representing a keel
+    Vector3f const keel_ef{0.f,0.f,1.f};
+    // rotate to body frame
+    Vector3f const keel_bf = Aircraft::dcm.mul_transpose(keel_ef);
+
+    auto const heelAngle_rad = wrap_PI(atan2(keel_bf.y, keel_bf.z));
+
+    if ( (update_time_s - last_print_time_s) > 1.f){
+       last_print_time_s = update_time_s;
+       printf("roll %f deg\n",degrees(heelAngle_rad));
+    }
     // speed along x axis, +ve is forward
     float const speed = velocity_body.x;
     // yaw rate in degrees/s
     float const yaw_rate = get_yaw_rate(steering, speed);
 
-    float const roll_rate = gyro.x - get_heel_angular_acceleration(force_heel,roll, gyro.x) * delta_time;
+    float const roll_rate = gyro.x - get_heel_angular_acceleration(force_heel,heelAngle_rad, gyro.x) * delta_time;
 
     gyro = Vector3f(roll_rate,0,radians(yaw_rate)) + wave_gyro;
 
