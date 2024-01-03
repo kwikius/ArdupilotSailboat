@@ -42,7 +42,7 @@ namespace SITL {
 Sailboat::Sailboat(const char *frame_str) :
     Aircraft(frame_str),
     steering_angle_max(35),
-    turning_circle(1.8),
+    turning_circle(2.5),
     sail_area(1.5)
 {
     Aircraft::mass = 4.0;  // kg
@@ -231,8 +231,8 @@ void Sailboat::update_wave(float delta_time)
 namespace {
 
    double constexpr vertical_ce = 0.35f; // m
-   double constexpr keel_mass = 2.5f;  // kg
-   double constexpr keel_depth = 0.5f;  // m
+   double constexpr keel_mass = 5.5f;  // kg
+   double constexpr keel_depth = 0.75f;  // m
    double constexpr keel_chord = 0.75f;  // m
    double constexpr water_density = 1000.f; // kg.m-3
    double constexpr g = 9.8f;
@@ -326,7 +326,6 @@ namespace {
    // angular momentum
    float L = 0.f;
    float heel_angle_1_rad = 0.f;
-   bool failed = false;
    int count = 0;
 }
 void Sailboat::update(const struct sitl_input &input)
@@ -379,15 +378,11 @@ void Sailboat::update(const struct sitl_input &input)
     const float sin_rot_rad = sinf(radians(wind_apparent_dir_bf_signed));
     const float cos_rot_rad = cosf(radians(wind_apparent_dir_bf_signed));
     const float force_fwd = lift_wf * sin_rot_rad - drag_wf * cos_rot_rad;
- //
-
     // how much time has passed?
     float const delta_time = frame_time_us * 1.0e-6f;
-   // update_time_s += delta_time;
-
     // speed in m/s in body frame
     Vector3f const velocity_body = dcm.transposed() * velocity_ef_water;
-#if (0)
+#if (1)
     //create a vertical component representing a keel
     Vector3f const keel_ef{0.f,0.f,1.f};
     // rotate to body frame
@@ -395,68 +390,40 @@ void Sailboat::update(const struct sitl_input &input)
 
     auto const heel_angle_rad = wrap_PI(atan2(keel_bf.y, keel_bf.z));
 #endif
-
-
-//    if ( (update_time_s - last_print_time_s) > 1.f){
-//       last_print_time_s = update_time_s;
-//       printf("roll %f deg\n",degrees(heelAngle_rad));
-//       printf ("delta time = %f\n", delta_time );
-//    }
     // speed along x axis, +ve is forward
      float const speed = velocity_body.x;
     // yaw rate in degrees/s
      float const yaw_rate = get_yaw_rate(steering, speed);
+     float roll_rate_rad_per_s = 1.f * L/ moment_of_inertia ;
+     if ( hal.util->get_soft_armed() ){
+       ++ count;
+      const float force_heel = -1.f * (lift_wf * cos_rot_rad + drag_wf * sin_rot_rad);
+      heel_angle_1_rad = heel_angle_rad;//+= roll_rate_rad_per_s * delta_time;
+      float const overturningTorque = get_overturning_torque(force_heel,heel_angle_1_rad);
+      float const rightingTorque =  get_righting_torque(heel_angle_1_rad);
+      float const dragTorque = get_heel_damping_torque(roll_rate_rad_per_s);
+      float const torque = overturningTorque + rightingTorque + dragTorque ;
 
-      if ( hal.util->get_soft_armed()  && !failed){
-
-    //  try{
-#if  1
-         // negate
-         const float force_heel = -1.f * (lift_wf * cos_rot_rad + drag_wf * sin_rot_rad);
-         float const roll_rate = 1.f * L/ moment_of_inertia ;
-         heel_angle_1_rad += roll_rate * delta_time;
-
-         // negates
-         float const overturningTorque = get_overturning_torque(force_heel,heel_angle_1_rad);
-         float const rightingTorque =  get_righting_torque(heel_angle_1_rad);
-         float const dragTorque = get_heel_damping_torque(roll_rate);
-         float const torque = overturningTorque + rightingTorque + dragTorque ;
- ++ count;
-         L += torque * delta_time;
-         update_time_s += delta_time;
-         if ( (update_time_s - last_print_time_s) > 1.f){
-       // if ( count < 10) {
-
-            printf("mainsail_angle = %f\n", mainsail_angle_bf);
-            printf("apparent wind angle = %f\n",wind_apparent_dir_bf_signed);
-            printf("apparent wind speed = %f\n",wind_apparent_speed_bf);
-            last_print_time_s = update_time_s;
-            printf("iter = %d, uptime = %f\n",count, update_time_s);
-            printf("heel force = %f\n" , force_heel);
-            printf("heel angle = %f\n", degrees(heel_angle_1_rad));
-            printf("roll_rate = %f\n",degrees(roll_rate));
-            printf("ovtn torque = %f\n", overturningTorque);
-            printf("rt torque = %f\n", rightingTorque);
-            printf("drag torque = %f\n", dragTorque);
-            printf("torque = %f\n", torque);
-
-         }
-//      } catch(...){
-//        failed = true;
-//         printf("fp exception\n");
-//      }
-#endif
+      L += torque * delta_time;
+      update_time_s += delta_time;
+      if ( (update_time_s - last_print_time_s) > 1.f){
+         printf("mainsail_angle = %f\n", mainsail_angle_bf);
+         printf("apparent wind angle = %f\n",wind_apparent_dir_bf_signed);
+         printf("apparent wind speed = %f\n",wind_apparent_speed_bf);
+         last_print_time_s = update_time_s;
+         printf("iter = %d, uptime = %f\n",count, update_time_s);
+         printf("heel force = %f\n" , force_heel);
+         printf("heel angle = %f\n", degrees(heel_angle_1_rad));
+         printf("roll_rate = %f\n",degrees(roll_rate_rad_per_s));
+         printf("ovtn torque = %f\n", overturningTorque);
+         printf("rt torque = %f\n", rightingTorque);
+         printf("drag torque = %f\n", dragTorque);
+         printf("torque = %f\n", torque);
       }
-
-    gyro = Vector3f(0,0,radians(yaw_rate)) + wave_gyro;
-
-    // update attitude
+    }
+    gyro = Vector3f(roll_rate_rad_per_s,0,radians(yaw_rate)) + wave_gyro;
     dcm.rotate(gyro * delta_time);
-
-
     dcm.normalize();
-
-
     // hull drag
     // waveDrag
     // skinFriction drag
