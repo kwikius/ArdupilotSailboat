@@ -62,8 +62,11 @@ private:
 
     // return roll angular acceleration in rad/s/s
     // from heel force and current roll angle
-    float get_heel_angular_acceleration(float force_heel_N, float current_roll_angle_bf_rad,float current_roll_rate)const;
+  //  float get_heel_angular_acceleration(float force_heel_N, float current_roll_angle_bf_rad,float current_roll_rate)const;
 
+    float get_overturning_torque( float heel_force_N,float heel_angle_rad)const;
+    float get_righting_torque( float heel_angle_rad) const;
+    float get_heel_damping_torque(float roll_rat_rad_per_s)const;
     // return lateral acceleration in m/s/s given a steering input (in the range -1 to +1) and speed in m/s
     float get_lat_accel(float steering, float speed) const;
 
