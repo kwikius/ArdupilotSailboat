@@ -412,7 +412,7 @@ void Sailboat::update(const struct sitl_input &input)
     //  try{
 #if  1
          // negate
-         const float force_heel = lift_wf * cos_rot_rad + drag_wf * sin_rot_rad;
+         const float force_heel = -1.f * (lift_wf * cos_rot_rad + drag_wf * sin_rot_rad);
          float const roll_rate = 1.f * L/ moment_of_inertia ;
          heel_angle_1_rad += roll_rate * delta_time;
 
