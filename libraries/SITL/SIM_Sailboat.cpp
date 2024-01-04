@@ -35,13 +35,15 @@ namespace SITL {
 #define THROTTLE_SERVO_CH   2   // throttle controlled by servo output 3
 #define DIRECT_WING_SERVO_CH 4
 
+//#define SITL_SAILBOAT_DEBUG_OUTPUT
+
     // very roughly sort of a stability factors for waves
 #define WAVE_ANGLE_GAIN 1
 #define WAVE_HEAVE_GAIN 1
 
 Sailboat::Sailboat(const char *frame_str) :
     Aircraft(frame_str),
-    steering_angle_max(35),
+    steering_angle_max(25),
     turning_circle(2.5),
     sail_area(1.5)
 {
@@ -111,26 +113,18 @@ void Sailboat::calc_lift_and_drag(float wind_speed_m_per_s, float angle_of_attac
     // Convert angle of attack to expected range for interpolation curves
     // ( +180 deg to - 180 deg )
     const float signed_aoa_deg = wrap_180(angle_of_attack_deg);
-
     const float abs_aoa_deg = fabs(signed_aoa_deg);
-
+    // Lift equation FL = 1/2 * Cl * rho * wind_speed_m_per_s^2 * sail_area
+    // Drag equation FD = 1/2 * Cd * rho * wind_speed_m_per_s^2 * sail_area
     float const cl = linear_interpolate(abs_aoa_deg, CL_curve, ARRAY_SIZE(CL_curve));
     float const cd = linear_interpolate(abs_aoa_deg, CD_curve, ARRAY_SIZE(CD_curve));
 
-    // Lift equation FL = 1/2 * Cl * rho * wind_speed_m_per_s^2 * sail_area
-    // Drag equation FD = 1/2 * Cd * rho * wind_speed_m_per_s^2 * sail_area
-    // here we currently use quasi units for the coefficients common to both equations
-    // TODO convert to actual si values
-    // need rho -> air density in kg.m-3
-    // actual sail area in m2
-    // actual wind speed in m.s-1
-    float air_density_kg_per_m3 = 1.225;
+    float const air_density_kg_per_m3 = 1.225;
     float const common_coefficient = 1./2. * air_density_kg_per_m3 * sq(wind_speed_m_per_s) * sail_area;
-    // force in direction of wind
+    // force in direction of apparent wind
     drag = cd * common_coefficient;
-    // force normal to direction of wind
+    // force normal to direction of apparent wind
     lift = cl * common_coefficient * signum(signed_aoa_deg);
-
 }
 
 // return turning circle (diameter) in meters for steering proportion in the range -1 to +1
@@ -158,8 +152,8 @@ float Sailboat::get_yaw_rate(float steering, float speed) const
 // return lateral acceleration in m/s/s given a steering input (in the range -1 to +1) and speed in m/s
 float Sailboat::get_lat_accel(float steering, float speed) const
 {
-    float yaw_rate = get_yaw_rate(steering, speed);
-    float accel = radians(yaw_rate) * speed;
+    float const yaw_rate = get_yaw_rate(steering, speed);
+    float const accel = radians(yaw_rate) * speed;
     return accel;
 }
 
@@ -202,8 +196,8 @@ void Sailboat::update_wave(float delta_time)
 
     // convert wave angle to vehicle frame
     const float heading_dif = wave_heading - y;
-    float angle_error_x = (sinf(heading_dif) * wave_angle) - r;
-    float angle_error_y = (cosf(heading_dif) * wave_angle) - p;
+    const float angle_error_x = (sinf(heading_dif) * wave_angle) - r;
+    const float angle_error_y = (cosf(heading_dif) * wave_angle) - p;
 
     // apply gain
     wave_gyro.x = angle_error_x * WAVE_ANGLE_GAIN;
@@ -218,86 +212,40 @@ void Sailboat::update_wave(float delta_time)
     }
 }
 
-/**
-  @brief return a heel angular acceleration in rad.s-2
-  @param[in] heel_force is the rolling force in N
-  @param[in] current_roll_angle_bf_rad is the current roll angle in radians
-  @param[in] current_roll_rate_rad_per_s is current roll rate in rad/s
-**/
-//namespace {
-//  int itercount =0;
-//}
-
 namespace {
 
-   double constexpr vertical_ce = 0.35f; // m
-   double constexpr keel_mass = 5.5f;  // kg
-   double constexpr keel_depth = 0.75f;  // m
+   // put these in a derived class of SITL::Sailboat?
+   double constexpr sail_vertical_ce = 0.35f; // m
+   double constexpr keel_mass = 2.5f;  // kg
+   double constexpr keel_depth = 0.4f;  // m
    double constexpr keel_chord = 0.75f;  // m
    double constexpr water_density = 1000.f; // kg.m-3
    double constexpr g = 9.8f;
    double constexpr moment_of_inertia = keel_mass * keel_depth * keel_depth;  // mass * d^2
-   double constexpr heel_damping_coefficient = 1.0;
+   double constexpr roll_damping_coefficient = 1.0;
 }
 
-/*
- @ brief overturning torque in N_M
-*/
-
-float Sailboat::get_overturning_torque( float heel_force_N,float heel_angle_rad)const
+float Sailboat::get_roll_overturning_torque( float heel_force_N,float heel_angle_rad)const
 {
-   auto const heelForceCE = vertical_ce * cos(heel_angle_rad);
+   auto const heelForceCE = sail_vertical_ce * cos(heel_angle_rad);
    return heel_force_N * heelForceCE;
 }
 
-float Sailboat::get_righting_torque( float heel_angle_rad)const
+float Sailboat::get_roll_righting_torque( float heel_angle_rad)const
 {
    return -1.f * keel_mass * g * sin(heel_angle_rad) * keel_depth;
 }
 
-float Sailboat::get_heel_damping_torque(float roll_rat_rad_per_s)const
+float Sailboat::get_roll_damping_torque(float roll_rat_rad_per_s)const
 {
    float constexpr omega0_rad_per_s = sqrt(g/keel_depth );
    // friction coeficient
    auto constexpr b = omega0_rad_per_s * keel_depth * keel_depth * 2 * keel_mass;
-   return -1.f * heel_damping_coefficient * b * roll_rat_rad_per_s ;
+   return -1.f * roll_damping_coefficient * b * roll_rat_rad_per_s ;
 }
+
 /*
-
-float Sailboat::get_heel_angular_acceleration(float force_heel,
- float current_roll_angle_bf_rad, float current_roll_rate_rad_per_s)const
-{
-   // no  angular acceleration during gyro init
-   if ( !hal.util->get_soft_armed()){
-       return 0.0;
-   }
-   //printf("force heel = %f N\n", force_heel);
-
-   // acceleration due to gravity m.s-2
-   double const overturning_torque = force_heel * vertical_ce * cosf(current_roll_angle_bf_rad);
-
-   double const righting_torque = -1.f * keel_mass * g * keel_depth * sinf(current_roll_angle_bf_rad);
-
-   double const keel_volume_swept_per_s = sq(keel_depth)* keel_chord * current_roll_rate_rad_per_s / 2.0;
-   double const water_mass_flow = keel_volume_swept_per_s * water_density;
-   double const drag_gain = 3.0;
-   double const water_velocity = drag_gain * keel_depth;
-   double const drag_torque = -1.0 * water_mass_flow * water_velocity * keel_depth;
-
-   double const torque = overturning_torque + righting_torque + drag_torque;
-
-   float  const res = static_cast<float>(torque / moment_of_inertia);
-   if(itercount < 30){
-     ++itercount;
-     printf("heel_force = %f N",force_heel);
-     printf("iter %d angular_acc = %f rad.s-2\n",itercount, res);
-   }
-   return res/1000.f;
-
-}
-*/
-/*
-  mainsail angle in body frame degrees
+ @brief get mainsail angle in body frame in degrees from the mainsail servo
 */
 float Sailboat::get_mainsail_angle_bf(const struct sitl_input &input)const
 {
@@ -312,21 +260,20 @@ float Sailboat::get_mainsail_angle_bf(const struct sitl_input &input)const
         // calculate mainsail angle from servo output 4, 0 to 90 degrees
         return constrain_float((input.servos[MAINSAIL_SERVO_CH]-1000)/1000.0f * 90.0f, 0.0f, 90.0f);
     }
-    //return aoa_deg;
 }
 
 /*
   update the sailboat simulation by one time step
  */
-
+#if defined (SITL_SAILBOAT_DEBUG_OUTPUT )
 namespace {
    float last_print_time_s = 0.f;
    float update_time_s = 0.f;
-   //int iter = 0;
-   // angular momentum
-   float L = 0.f;
-   float heel_angle_1_rad = 0.f;
    int count = 0;
+}
+#endif // defined
+namespace {
+   float roll_angular_momentum = 0.f;
 }
 void Sailboat::update(const struct sitl_input &input)
 {
@@ -359,10 +306,9 @@ void Sailboat::update(const struct sitl_input &input)
     float aoa_deg = 0.f ;
     if (sitl->sail_type.get() == Sail_type::directly_actuated_wing) {
         // directly actuated wing
-        printf("%f,%f,%f,%f\n",L, heel_angle_1_rad,update_time_s,last_print_time_s );
         aoa_deg = wind_apparent_dir_bf_signed - mainsail_angle_bf;
     }else{
-       // Sail_type::mainsail_with_sheet
+        // Sail_type::mainsail_with_sheet
         // Calculate angle-of-attack from wind to mainsail,
         // but cannot have negative angle of attack, sheet would go slack.
         aoa_deg =
@@ -382,48 +328,56 @@ void Sailboat::update(const struct sitl_input &input)
     float const delta_time = frame_time_us * 1.0e-6f;
     // speed in m/s in body frame
     Vector3f const velocity_body = dcm.transposed() * velocity_ef_water;
-#if (1)
-    //create a vertical component representing a keel
+
+
+    // to calculate heel angle
+    // create a vertical component representing a keel
     Vector3f const keel_ef{0.f,0.f,1.f};
     // rotate to body frame
     Vector3f const keel_bf = Aircraft::dcm.mul_transpose(keel_ef);
-
+    // and so get heel angle
     auto const heel_angle_rad = wrap_PI(atan2(keel_bf.y, keel_bf.z));
-#endif
     // speed along x axis, +ve is forward
      float const speed = velocity_body.x;
     // yaw rate in degrees/s
      float const yaw_rate = get_yaw_rate(steering, speed);
-     float roll_rate_rad_per_s = 1.f * L/ moment_of_inertia ;
+
+     // Calculate the roll rate for the gyro
+     float const roll_rate_rad_per_s = 1.f * roll_angular_momentum/ moment_of_inertia ;
+
+     // Only do heel calcs if armed else will mess with imu
      if ( hal.util->get_soft_armed() ){
-       ++ count;
       const float force_heel = -1.f * (lift_wf * cos_rot_rad + drag_wf * sin_rot_rad);
-      heel_angle_1_rad = heel_angle_rad;//+= roll_rate_rad_per_s * delta_time;
-      float const overturningTorque = get_overturning_torque(force_heel,heel_angle_1_rad);
-      float const rightingTorque =  get_righting_torque(heel_angle_1_rad);
-      float const dragTorque = get_heel_damping_torque(roll_rate_rad_per_s);
+      float const overturningTorque = get_roll_overturning_torque(force_heel,heel_angle_rad);
+      float const rightingTorque = get_roll_righting_torque(heel_angle_rad);
+      float const dragTorque = get_roll_damping_torque(roll_rate_rad_per_s);
       float const torque = overturningTorque + rightingTorque + dragTorque ;
 
-      L += torque * delta_time;
+      roll_angular_momentum += torque * delta_time;
+#if defined ( SITL_SAILBOAT_DEBUG_OUTPUT)
       update_time_s += delta_time;
       if ( (update_time_s - last_print_time_s) > 1.f){
+         ++ count;
          printf("mainsail_angle = %f\n", mainsail_angle_bf);
          printf("apparent wind angle = %f\n",wind_apparent_dir_bf_signed);
          printf("apparent wind speed = %f\n",wind_apparent_speed_bf);
          last_print_time_s = update_time_s;
          printf("iter = %d, uptime = %f\n",count, update_time_s);
          printf("heel force = %f\n" , force_heel);
-         printf("heel angle = %f\n", degrees(heel_angle_1_rad));
+         printf("heel angle = %f\n", degrees(heel_angle_rad));
          printf("roll_rate = %f\n",degrees(roll_rate_rad_per_s));
          printf("ovtn torque = %f\n", overturningTorque);
          printf("rt torque = %f\n", rightingTorque);
          printf("drag torque = %f\n", dragTorque);
          printf("torque = %f\n", torque);
       }
+#endif
     }
     gyro = Vector3f(roll_rate_rad_per_s,0,radians(yaw_rate)) + wave_gyro;
     dcm.rotate(gyro * delta_time);
     dcm.normalize();
+
+    // TODO
     // hull drag
     // waveDrag
     // skinFriction drag
