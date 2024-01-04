@@ -35,7 +35,10 @@ namespace SITL {
 #define THROTTLE_SERVO_CH   2   // throttle controlled by servo output 3
 #define DIRECT_WING_SERVO_CH 4
 
+// define for some roll debug output
 //#define SITL_SAILBOAT_DEBUG_OUTPUT
+// define to apply roll due to sail force etc
+ #define SITL_SAILBOAT_APPLY_ROLL
 
     // very roughly sort of a stability factors for waves
 #define WAVE_ANGLE_GAIN 1
@@ -216,8 +219,8 @@ namespace {
 
    // put these in a derived class of SITL::Sailboat?
    double constexpr sail_vertical_ce = 0.35f; // m
-   double constexpr keel_mass = 2.5f;  // kg
-   double constexpr keel_depth = 0.4f;  // m
+   double constexpr keel_mass = 5.f;  // kg
+   double constexpr keel_depth = 0.5f;  // m
    double constexpr keel_chord = 0.75f;  // m
    double constexpr water_density = 1000.f; // kg.m-3
    double constexpr g = 9.8f;
@@ -329,12 +332,13 @@ void Sailboat::update(const struct sitl_input &input)
     // speed in m/s in body frame
     Vector3f const velocity_body = dcm.transposed() * velocity_ef_water;
 
-
     // to calculate heel angle
     // create a vertical component representing a keel
     Vector3f const keel_ef{0.f,0.f,1.f};
     // rotate to body frame
     Vector3f const keel_bf = Aircraft::dcm.mul_transpose(keel_ef);
+
+    // rotate
     // and so get heel angle
     auto const heel_angle_rad = wrap_PI(atan2(keel_bf.y, keel_bf.z));
     // speed along x axis, +ve is forward
@@ -373,7 +377,19 @@ void Sailboat::update(const struct sitl_input &input)
       }
 #endif
     }
-    gyro = Vector3f(roll_rate_rad_per_s,0,radians(yaw_rate)) + wave_gyro;
+#if defined ( SITL_SAILBOAT_APPLY_ROLL )
+
+    Matrix3f rollMatrix;
+    rollMatrix.from_euler(roll_rate_rad_per_s,0,0);
+    Matrix3f yawMatrix;
+    yawMatrix.from_euler(0,0,radians(yaw_rate));
+    Matrix3f result = yawMatrix * rollMatrix;
+    //gyro = Vector3f(roll_rate_rad_per_s,0,radians(yaw_rate)) + wave_gyro;
+    result.to_euler(&gyro.x,&gyro.y,&gyro.z);
+    gyro += wave_gyro;
+#else
+    gyro = Vector3f(0,0,radians(yaw_rate)) + wave_gyro;
+#endif
     dcm.rotate(gyro * delta_time);
     dcm.normalize();
 
