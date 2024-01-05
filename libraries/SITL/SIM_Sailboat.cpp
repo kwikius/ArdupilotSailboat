@@ -379,6 +379,7 @@ void Sailboat::update(const struct sitl_input &input)
     }
 #if defined ( SITL_SAILBOAT_APPLY_ROLL )
 
+#if (0)
     Matrix3f rollMatrix;
     rollMatrix.from_euler(roll_rate_rad_per_s,0,0);
     Matrix3f yawMatrix;
@@ -387,6 +388,9 @@ void Sailboat::update(const struct sitl_input &input)
     //gyro = Vector3f(roll_rate_rad_per_s,0,radians(yaw_rate)) + wave_gyro;
     result.to_euler(&gyro.x,&gyro.y,&gyro.z);
     gyro += wave_gyro;
+#else
+    gyro = Vector3f(roll_rate_rad_per_s,0,radians(yaw_rate)) + wave_gyro;
+#endif
 #else
     gyro = Vector3f(0,0,radians(yaw_rate)) + wave_gyro;
 #endif
