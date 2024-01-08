@@ -242,7 +242,7 @@ float Sailboat::get_roll_righting_torque( float heel_angle_rad)const
 float Sailboat::get_roll_damping_torque(float roll_rat_rad_per_s)const
 {
    float constexpr omega0_rad_per_s = sqrt(g/keel_depth );
-   // friction coeficient
+   // friction coefficient
    auto constexpr b = omega0_rad_per_s * keel_depth * keel_depth * 2 * keel_mass;
    return -1.f * roll_damping_coefficient * b * roll_rat_rad_per_s ;
 }
@@ -296,7 +296,6 @@ void Sailboat::update(const struct sitl_input &input)
     // to wind vector seen by boat
     Vector3f const wind_apparent_bf = dcm.mul_transpose(wind_apparent_ef);
     float const wind_apparent_dir_bf_signed = wrap_180(degrees(atan2(wind_apparent_bf.y,wind_apparent_bf.x)));
-    //
     float const wind_apparent_speed_bf = safe_sqrt(sq(wind_apparent_bf.y)+sq(wind_apparent_bf.x));
 
     // set RPM and airspeed from wind speed, allows to test RPM and Airspeed wind vane back end in SITL
@@ -334,17 +333,32 @@ void Sailboat::update(const struct sitl_input &input)
 
     // to calculate heel angle
     // create a vertical component representing a keel
-    Vector3f const keel_ef{0.f,0.f,1.f};
-    // rotate to body frame
-    Vector3f const keel_bf = Aircraft::dcm.mul_transpose(keel_ef);
+    Vector3f const keel_bf{0.f,0.f,1.f};
+    // rotate to world frame..
+    Vector3f const keel_ef0 = Aircraft::dcm * keel_bf;
 
-    // rotate
-    // and so get heel angle
-    auto const heel_angle_rad = wrap_PI(atan2(keel_bf.y, keel_bf.z));
+    Vector3f curEuler;
+    dcm.to_euler(&curEuler.x,&curEuler.y, & curEuler.z);
+
+ #if (1)
+    Quaternion q1 ;
+    q1.from_rotation_matrix(dcm);
+    Quaternion q2;
+    q2.from_axis_angle( Vector3f(0,0,1),-curEuler.z);
+    auto const qT = q2 * q1;
+    Vector3f const keel_ef = qT * keel_ef0;
+#else
+    Matrix3f unRot=Matrix3f{}.from_euler(0,0,-curEuler.z);
+    Vector3f const keel_ef = unRot * keel_ef0;
+#endif
+    // unrotate by yaw
+    // to get heel angle
+    // auto const heel_angle_rad = -wrap_PI(atan2(keel_ef.y, keel_ef.z));
+    auto const heel_angle_rad = -wrap_PI(atan2(keel_ef.y, keel_ef.z));
     // speed along x axis, +ve is forward
-     float const speed = velocity_body.x;
+    float const speed = velocity_body.x;
     // yaw rate in degrees/s
-     float const yaw_rate = get_yaw_rate(steering, speed);
+    float const yaw_rate = get_yaw_rate(steering, speed);
 
      // Calculate the roll rate for the gyro
      float const roll_rate_rad_per_s = 1.f * roll_angular_momentum/ moment_of_inertia ;
