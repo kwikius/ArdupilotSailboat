@@ -393,6 +393,12 @@ void Sailboat::update(const struct sitl_input &input)
     }
 #if defined ( SITL_SAILBOAT_APPLY_ROLL )
 
+ // for now need to rotate yaw_rat_rad_per_s around x by -heel_angle_rad
+    Quaternion q_unroll_yaw_rate;
+    q_unroll_yaw_rate.from_axis_angle(Vector3f{1,0,0},-heel_angle_rad);
+    Vector3f yaw_rate_no_roll_rad_per_s = q_unroll_yaw_rate * Vector3f{0.f,0.f,static_cast<float>(radians(yaw_rate))};
+    gyro = Vector3f(roll_rate_rad_per_s,0,0) + yaw_rate_no_roll_rad_per_s + wave_gyro;
+
 #if (0)
     Matrix3f rollMatrix;
     rollMatrix.from_euler(roll_rate_rad_per_s,0,0);
@@ -403,7 +409,7 @@ void Sailboat::update(const struct sitl_input &input)
     result.to_euler(&gyro.x,&gyro.y,&gyro.z);
     gyro += wave_gyro;
 #else
-    gyro = Vector3f(roll_rate_rad_per_s,0,radians(yaw_rate)) + wave_gyro;
+  // gyro = Vector3f(roll_rate_rad_per_s,0,radians(yaw_rate)) + wave_gyro;
 #endif
 #else
     gyro = Vector3f(0,0,radians(yaw_rate)) + wave_gyro;
@@ -432,6 +438,7 @@ void Sailboat::update(const struct sitl_input &input)
 
     // add in accel due to direction change
     accel_body.y += radians(yaw_rate) * speed;
+    //accel_body += yaw_rate_no_roll_rad_per_s * speed;
 
     // now in earth frame
     // remove roll and pitch effects from waves
