@@ -214,10 +214,11 @@ protected:
     // Rangefinder
     float rangefinder_m[SITL_NUM_RANGEFINDERS];
 
-    // Windvane apparent wind
+    // Windvane apparent wind in body frame
+    // x and y ?
     struct {
-        float speed;
-        float direction;
+        float speed;     // m/s
+        float direction; // radians
     } wind_vane_apparent;
 
     // Wind Turbulence simulated Data

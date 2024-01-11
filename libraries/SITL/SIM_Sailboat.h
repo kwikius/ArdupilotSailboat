@@ -68,6 +68,8 @@ private:
 
     float get_mainsail_angle_bf(const struct sitl_input &input)const;
 
+    // update aircraft ::wind and apparent wind etc
+    void update_wind_all(const struct sitl_input &input);
     // simulate waves and swell
     void update_wave(float delta_time);
 
@@ -83,6 +85,9 @@ private:
 
     Vector3f velocity_ef_water; // m/s
     Vector3f wave_gyro;         // rad/s
+    Vector3f wind_apparent_ef;
+    // Rotate the earth frame apparent wind vector to body frame
+    Vector3f wind_apparent_bf;
     float wave_heave;           // m/s/s
     float wave_phase;           // rads
 };

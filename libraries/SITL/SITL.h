@@ -36,7 +36,7 @@ enum class LedLayout {
     ROWS=0,
     LUMINOUSBEE=1,
 };
-    
+
 struct vector3f_array {
     uint16_t length;
     Vector3f *data;
@@ -46,7 +46,7 @@ struct float_array {
     uint16_t length;
     float *data;
 };
-    
+
 
 struct sitl_fdm {
     // this is the structure passed between FDM models and the main SITL code
@@ -85,8 +85,8 @@ struct sitl_fdm {
     float airspeed_raw_pressure[AIRSPEED_MAX_SENSORS];
 
     struct {
-        float speed;
-        float direction;
+        float speed;      // m.s-1
+        float direction;  // in radians
     } wind_vane_apparent;
 
     bool is_lock_step_scheduled;
@@ -294,7 +294,7 @@ public:
         AP_Int8  signflip;
     };
     AirspeedParm airspeed[AIRSPEED_MAX_SENSORS];
-    
+
     // EFI type
     enum EFIType {
         EFI_TYPE_NONE = 0,
@@ -302,7 +302,7 @@ public:
         EFI_TYPE_LOWEHEISER = 2,
         EFI_TYPE_HIRTH = 8,
     };
-    
+
     AP_Int8  efi_type;
 
     // wind control
@@ -311,7 +311,7 @@ public:
         WIND_TYPE_NO_LIMIT = 1,
         WIND_TYPE_COEF = 2,
     };
-    
+
     float wind_speed_active;
     float wind_direction_active;
     float wind_dir_z_active;
@@ -351,7 +351,7 @@ public:
     AP_Float temp_board_offset;     // [deg C] Barometer board temperature offset from atmospheric temperature
     AP_Float temp_tconst;           // [deg C] Barometer warmup temperature time constant
     AP_Float temp_baro_factor;
-    
+
     AP_Int8 thermal_scenario;
 
     // weight on wheels pin
@@ -370,7 +370,7 @@ public:
 
     // what servos are motors
     AP_Int32 vibe_motor_mask;
-    
+
     // minimum throttle for addition of ins noise
     AP_Float ins_noise_throttle_min;
 

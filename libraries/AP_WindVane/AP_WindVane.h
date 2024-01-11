@@ -72,10 +72,10 @@ public:
     // get the true wind direction in radians, 0 = wind coming from north
     float get_true_wind_direction_rad() const { return _direction_true; }
 
-    // Return apparent wind speed
+    // Return apparent wind speed in m/s
     float get_apparent_wind_speed() const { return _speed_apparent; }
 
-    // Return true wind speed
+    // Return true wind speed in m/s
     float get_true_wind_speed() const { return _speed_true; }
 
     // Return the apparent wind angle used to determin the current tack

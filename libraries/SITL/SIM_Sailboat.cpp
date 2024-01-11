@@ -278,37 +278,46 @@ namespace {
 namespace {
    float roll_angular_momentum = 0.f;
 }
+
+void Sailboat::update_wind_all(const struct sitl_input &input)
+{
+    Aircraft::update_wind(input);
+    // calculate apparent wind in earth-frame (this is the direction the wind is coming from)
+    // Note that the SITL wind direction is defined as the direction the wind is travelling to
+    // This is accounted for in these calculations
+    // 3d
+    wind_apparent_ef = Aircraft::velocity_ef - Aircraft::wind_ef;
+    // Rotate the earth frame apparent wind vector to body frame
+    wind_apparent_bf = dcm.transposed() * wind_apparent_ef;
+    // body frame
+    wind_vane_apparent.speed = safe_sqrt(sq(wind_apparent_bf.y)+sq(wind_apparent_bf.x));
+    wind_vane_apparent.direction = atan2(wind_apparent_bf.y,wind_apparent_bf.x);
+
+    // set RPM and airspeed from wind speed, allows to test RPM and Airspeed wind vane back end in SITL
+    rpm[0] = wind_vane_apparent.speed;
+    // in practise depends on where pitot is attached on the boat
+    // here it would be smehow in line with the wind vane
+    airspeed_pitot = wind_vane_apparent.speed;
+
+}
+
 void Sailboat::update(const struct sitl_input &input)
 {
-    // update wind
-    update_wind(input);
-
+    // update Aircraft::wind_ef -- wind vector in earth frame
+    update_wind_all();
     // in sailboats the steering controls the rudder, the throttle controls the main sail position
     // steering input -1 to 1
     float steering = 2*((input.servos[STEERING_SERVO_CH]-1000)/1000.0f - 0.5f);
 
-    // calculate apparent wind in earth-frame (this is the direction the wind is coming from)
-    // Note than the SITL wind direction is defined as the direction the wind is travelling to
-    // This is accounted for in these calculations
-    Vector3f const wind_apparent_ef = Aircraft::velocity_ef - Aircraft::wind_ef;
-
-    // Rotate the vector to body frame vector wind_vector_bf using dcm
-    // to wind vector seen by boat
-    Vector3f const wind_apparent_bf = dcm.mul_transpose(wind_apparent_ef);
-    float const wind_apparent_dir_bf_signed = wrap_180(degrees(atan2(wind_apparent_bf.y,wind_apparent_bf.x)));
-    float const wind_apparent_speed_bf = safe_sqrt(sq(wind_apparent_bf.y)+sq(wind_apparent_bf.x));
-
-    // set RPM and airspeed from wind speed, allows to test RPM and Airspeed wind vane back end in SITL
-    rpm[0] = wind_apparent_speed_bf;
-    airspeed_pitot = wind_apparent_speed_bf;
-
+    // make into state ?
     float const mainsail_angle_bf = get_mainsail_angle_bf(input);
 
+    float const apparent_wind_dir_bf_signed = WRAP180(degrees(wind_vane_apparent.direction)) ;
     // sail angle of attack
     float aoa_deg = 0.f ;
     if (sitl->sail_type.get() == Sail_type::directly_actuated_wing) {
         // directly actuated wing
-        aoa_deg = wind_apparent_dir_bf_signed - mainsail_angle_bf;
+        aoa_deg = apparent_wind_dir_bf_signed - mainsail_angle_bf;
     }else{
         // Sail_type::mainsail_with_sheet
         // Calculate angle-of-attack from wind to mainsail,
