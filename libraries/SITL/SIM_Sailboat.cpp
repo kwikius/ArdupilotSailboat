@@ -304,7 +304,7 @@ void Sailboat::update_wind_all(const struct sitl_input &input)
 void Sailboat::update(const struct sitl_input &input)
 {
     // update Aircraft::wind_ef -- wind vector in earth frame
-    update_wind_all();
+    update_wind_all(input);
     // in sailboats the steering controls the rudder, the throttle controls the main sail position
     // steering input -1 to 1
     float steering = 2*((input.servos[STEERING_SERVO_CH]-1000)/1000.0f - 0.5f);
@@ -312,7 +312,7 @@ void Sailboat::update(const struct sitl_input &input)
     // make into state ?
     float const mainsail_angle_bf = get_mainsail_angle_bf(input);
 
-    float const apparent_wind_dir_bf_signed = WRAP180(degrees(wind_vane_apparent.direction)) ;
+    float const apparent_wind_dir_bf_signed = wrap_180(degrees(wind_vane_apparent.direction)) ;
     // sail angle of attack
     float aoa_deg = 0.f ;
     if (sitl->sail_type.get() == Sail_type::directly_actuated_wing) {
@@ -323,17 +323,17 @@ void Sailboat::update(const struct sitl_input &input)
         // Calculate angle-of-attack from wind to mainsail,
         // but cannot have negative angle of attack, sheet would go slack.
         aoa_deg =
-           MAX(fabsf(wind_apparent_dir_bf_signed) - mainsail_angle_bf, 0) *
-              signum(wind_apparent_dir_bf_signed);
+           MAX(fabsf(apparent_wind_dir_bf_signed) - mainsail_angle_bf, 0) *
+              signum(apparent_wind_dir_bf_signed);
     }
 
     // calculate Lift force (perpendicular to wind direction) and Drag force (parallel to wind direction)
     float lift_wf, drag_wf;
-    calc_lift_and_drag(wind_apparent_speed_bf, aoa_deg, lift_wf, drag_wf);
+    calc_lift_and_drag(wind_vane_apparent.speed, aoa_deg, lift_wf, drag_wf);
 
     // rotate lift and drag from wind frame into body frame
-    const float sin_rot_rad = sinf(radians(wind_apparent_dir_bf_signed));
-    const float cos_rot_rad = cosf(radians(wind_apparent_dir_bf_signed));
+    const float sin_rot_rad = sinf(radians(apparent_wind_dir_bf_signed));
+    const float cos_rot_rad = cosf(radians(apparent_wind_dir_bf_signed));
     const float force_fwd = lift_wf * sin_rot_rad - drag_wf * cos_rot_rad;
     // how much time has passed?
     float const delta_time = frame_time_us * 1.0e-6f;
