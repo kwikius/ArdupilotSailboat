@@ -953,16 +953,16 @@ float AR_AttitudeControl::get_sail_out_from_heel(float desired_heel, float dt)
 
     // get p, constrain to be zero or negative
     float p = _sailboat_heel_pid.get_p();
-    if (is_positive(p)) {
-        p = 0.0f;
-    }
+//    if (is_positive(p)) {
+//        p = 0.0f;
+//    }
 
     // get i, constrain to be zero or negative
     float i = _sailboat_heel_pid.get_i();
-    if (is_positive(i)) {
-        i = 0.0f;
-        _sailboat_heel_pid.reset_I();
-    }
+//    if (is_positive(i)) {
+//        i = 0.0f;
+//        _sailboat_heel_pid.reset_I();
+//    }
 
     // get d
     const float d = _sailboat_heel_pid.get_d();

@@ -241,16 +241,22 @@ void Sailboat::get_throttle_and_mainsail_out(float desired_speed, float &throttl
         return;
     }
 
-    // use PID controller to sheet out. This number is expected approximately
-    // in the 0 to 100 range (with default PIDs)
-    const float pid_offset =
-       rover.g2.attitude_control.get_sail_out_from_heel(
-       radians(sail_heel_angle_max), rover.G_Dt) * 100.0f;
+
 
     // get apparent wind, + is wind over starboard side, - is wind over port side
     const float wind_dir_apparent = degrees(rover.g2.windvane.get_apparent_wind_direction_rad());
     const float wind_dir_apparent_abs = fabsf(wind_dir_apparent);
     const float wind_dir_apparent_sign = is_negative(wind_dir_apparent) ? -1.0f : 1.0f;
+
+    // use PID controller to sheet out. This number is expected approximately
+    // in the 0 to 100 range (with default PIDs)
+    // PID positive means sheet out
+
+    const float pid_offset = ( wind_dir_apparent_abs < 90.f)
+      ?  cosF( radians(wind_dir_apparent_abs)) *
+       rover.g2.attitude_control.get_sail_out_from_heel(
+       radians(sail_heel_angle_max), rover.G_Dt) * 100.f
+      : 0.f;
 
     // mainsail control
 
@@ -264,18 +270,25 @@ void Sailboat::get_throttle_and_mainsail_out(float desired_speed, float &throttl
         mainsail_out = 100.0f;
      }else{
         // set sail required angle of attack according to user mainsail input
+        // User can adjust wanted sail angle of attack from sail_angle_ideal to 0
+        // by sheeting out
         float const sail_angle_req = sail_angle_ideal * user_mainsail_pc;
+
         // set the main sail to the required angle to the wind
         // make sure between allowable range
         // Sails are sheeted the same on each side, so use abs wind direction
-        float const mainsail_angle = constrain_float(wind_dir_apparent_abs - sail_angle_req,sail_angle_min, sail_angle_max);
+        float const sail_angle_min_iter = MAX(wind_dir_apparent_abs - sail_angle_ideal,static_cast<float>(sail_angle_min));
+
+        float const mainsail_angle = constrain_float(wind_dir_apparent_abs - sail_angle_req + pid_offset,
+          sail_angle_min_iter, sail_angle_max);
 
         init_mainsail_out_interpolation_curve();
         float const mainsail_base = linear_interpolate(mainsail_angle,sail_pts,sail_num_points);
 
-        mainsail_out = constrain_float((mainsail_base + pid_offset), 0.0f ,100.0f);
+        mainsail_out = constrain_float(mainsail_base , 0.0f ,100.0f);
      }
 
+    //
 
     //
     // wingsail control
@@ -376,7 +389,6 @@ float Sailboat::get_tack_heading_rad()
        ((AP_HAL::millis() - tack_request_ms) > SAILBOAT_AUTO_TACKING_TIMEOUT_MS)) {
         clear_tack();
     }
-
     return tack_heading_rad;
 }
 
