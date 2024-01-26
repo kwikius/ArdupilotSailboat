@@ -204,7 +204,6 @@ void Sailboat::get_pilot_desired_mainsail(float &mainsail_out, float &wingsail_o
     mast_rotation_out = constrain_float(channel_mainsail->get_control_in(), -100.0f, 100.0f);
 }
 
-
 // calculate throttle and mainsail angle required to attain desired speed (in m/s)
 // returns true if successful, false if sailboats not enabled
 // called in auto, acro, guidd, loite
@@ -241,8 +240,6 @@ void Sailboat::get_throttle_and_mainsail_out(float desired_speed, float &throttl
         return;
     }
 
-
-
     // get apparent wind, + is wind over starboard side, - is wind over port side
     const float wind_dir_apparent = degrees(rover.g2.windvane.get_apparent_wind_direction_rad());
     const float wind_dir_apparent_abs = fabsf(wind_dir_apparent);
@@ -250,53 +247,57 @@ void Sailboat::get_throttle_and_mainsail_out(float desired_speed, float &throttl
 
     // use PID controller to sheet out. This number is expected approximately
     // in the 0 to 100 range (with default PIDs)
-    // PID positive means sheet out
-
-    const float pid_offset = ( wind_dir_apparent_abs < 90.f)
+    // PID positive means sheet out, negative PID means sheet in
+    // N.B the pid is only used between 0 and degrees aoa.
+    //  scaled according to boat frame apparent wind angle
+    // TODO this pid should be mixed with a pitch_pid
+    const float heel_pid_offset = ( wind_dir_apparent_abs < 90.f)
       ?  cosF( radians(wind_dir_apparent_abs)) *
        rover.g2.attitude_control.get_sail_out_from_heel(
        radians(sail_heel_angle_max), rover.G_Dt) * 100.f
       : 0.f;
 
-    // mainsail control
-
-     // n.b with mainsail set in range 0 to 100
-     // get user mainsail percentage angle of attack
-     // max throttle gives smallest angle of attack and min throttle gives largest.
-     // this gives a feel in same sense as main sheet
-     float const user_mainsail_pc = 1.f - constrain_float(channel_mainsail->get_control_in(),0,100)/100;
+     // Get user mainsail percentage angle of attack.
+     // N.B Here uses the classic RC sailors TX setup where sheeting in is by pulling throttle stick
+     // towards the user. TODO make this parametric.
+     const float user_mainsail_pc = 1.f - constrain_float(channel_mainsail->get_control_in(),0,100)/100;
      // if mainsail angle is negligible ( less than 10 %) just sheet right out
      if ( user_mainsail_pc < 0.1f){
         mainsail_out = 100.0f;
      }else{
-        // set sail required angle of attack according to user mainsail input
-        // User can adjust wanted sail angle of attack from sail_angle_ideal to 0
-        // by sheeting out
-        float const sail_angle_req = sail_angle_ideal * user_mainsail_pc;
+        // Set sail required angle of attack according to user mainsail input.
 
-        // set the main sail to the required angle to the wind
-        // make sure between allowable range
-        // Sails are sheeted the same on each side, so use abs wind direction
-        float const sail_angle_min_iter = MAX(wind_dir_apparent_abs - sail_angle_ideal,static_cast<float>(sail_angle_min));
+        // User can adjust the desired sail angle of attack (aoa) from sail_angle_ideal to 10% of sail_angle_ideal
+        // by sheeting out in auto modes. Get the users wanted angle of attack.
+        const float sail_angle_req = sail_angle_ideal * user_mainsail_pc;
 
-        float const mainsail_angle = constrain_float(wind_dir_apparent_abs - sail_angle_req + pid_offset,
-          sail_angle_min_iter, sail_angle_max);
+        // Calculate the minimum sail angle to avoid stall based on the SAIL_ANGLE_MIN param
+        const float sail_angle_min_unstalled = MAX(wind_dir_apparent_abs - sail_angle_ideal,static_cast<float>(sail_angle_min));
 
+        // The required body frame mainsail angle is calculated from the user requested aoa, apparent wind and the
+        // pid offset to adjust for heel. The result is constrained so that the sail will not be stalled
+        // by sheeting in too far and to the max sheeted out angle.
+        // TODO could scale heel_pid_offset here by (sail_angle_max - sail_angle_min)/ 100.f,
+        // for compatibility with older algorithm, since we apply it to mainsail angle here, not actuator position.
+        const float mainsail_angle = constrain_float(wind_dir_apparent_abs - sail_angle_req + heel_pid_offset,
+          sail_angle_min_unstalled, sail_angle_max);
+
+        // An interpolated curve is used to convert from mainsail angle to actuator output.
+        // It defaults to 2 points only!
+        // For now reinit it each time for dynamic mods to curve.
+        // see https://discuss.ardupilot.org/t/sailboat-support/32060/866?u=skyscraper
         init_mainsail_out_interpolation_curve();
-        float const mainsail_base = linear_interpolate(mainsail_angle,sail_pts,sail_num_points);
+        const float mainsail_base = linear_interpolate(mainsail_angle,sail_pts,sail_num_points);
 
         mainsail_out = constrain_float(mainsail_base , 0.0f ,100.0f);
      }
 
     //
-
-    //
     // wingsail control
-    //
 
     // wing sails auto trim, we only need to reduce power if we are tipping over, must also be trimmed for correct tack
     // dont allow to reduce power to less than 0, ie not backwinding the sail to self-right
-    wingsail_out = (100.0f - MIN(pid_offset,100.0f)) * wind_dir_apparent_sign;
+    wingsail_out = (100.0f - constrain_float(heel_pid_offset,0.f,100.0f)) * wind_dir_apparent_sign;
 
     // wing sails can be used to go backwards, probably not recommended though
     if (is_negative(desired_speed)) {
@@ -321,9 +322,11 @@ void Sailboat::get_throttle_and_mainsail_out(float desired_speed, float &throttl
             float mast_rotation_angle;
             if (wind_dir_apparent_abs < (90.0f + sail_angle_ideal)) {
                 // use sail as a lift device, at ideal angle of attack, but depower to prevent excessive heel
-                // multiply pid_offset by 0.01 to keep the scaling in the same range as the other sail outputs
+                // multiply heel_pid_offset by 0.01 to keep the scaling in the same range as the other sail outputs
                 // this means the default PIDs should apply reasonably well to all sail types
-                mast_rotation_angle = wind_dir_apparent_abs - sail_angle_ideal * MAX(1.0f - pid_offset*0.01f,0.0f);
+                // N.B the heel_pid_offset here is applied to an angle rather than the winch pos
+                // so pid will be different to that applied to mainsail with sheet
+                mast_rotation_angle = wind_dir_apparent_abs - sail_angle_ideal * MAX(1.0f - heel_pid_offset*0.01f,0.0f);
 
                 // restore sign
                 mast_rotation_angle *= wind_dir_apparent_sign;
